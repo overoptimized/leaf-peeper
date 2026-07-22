@@ -330,39 +330,11 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
           background: 'rgba(25, 30, 40, 0.45)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <select 
-                value={selectedYear}
-                onChange={(e) => {
-                  const newYear = parseInt(e.target.value);
-                  setSelectedYear(newYear);
-                  window.dispatchEvent(new CustomEvent('yearChanged', { detail: newYear }));
-                }}
-                style={{
-                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                  color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '14px',
-                  fontWeight: 600, outline: 'none', cursor: 'pointer'
-                }}
-              >
-                <option value={2026} style={{ color: 'black' }}>2026 Average</option>
-                <option value={2025} style={{ color: 'black' }}>2025</option>
-                <option value={2024} style={{ color: 'black' }}>2024</option>
-                <option value={2023} style={{ color: 'black' }}>2023</option>
-                <option value={2022} style={{ color: 'black' }}>2022</option>
-                <option value={2021} style={{ color: 'black' }}>2021</option>
-                <option value={2020} style={{ color: 'black' }}>2020</option>
-                <option value={2019} style={{ color: 'black' }}>2019</option>
-                <option value={2018} style={{ color: 'black' }}>2018</option>
-                <option value={2017} style={{ color: 'black' }}>2017</option>
-                <option value={2016} style={{ color: 'black' }}>2016</option>
-                <option value={2015} style={{ color: 'black' }}>2015</option>
-              </select>
-              <span style={{ fontWeight: 600, fontSize: '16px', color: '#fff' }}>
-                {new Date(2026, 8, 1 + sliderValue).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '12px', fontSize: '13px', fontWeight: 400 }}>
-                  {selectedYear === 2026 ? '(Estimate)' : '(Historical)'}
-                </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ fontWeight: 600, fontSize: '18px', color: '#fff' }}>
+              {new Date(2026, 8, 1 + sliderValue).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+              <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '12px', fontSize: '14px', fontWeight: 400 }}>
+                {selectedYear === 2026 ? '2026 (Estimate)' : `${selectedYear} (Historical)`}
               </span>
             </div>
             <button 
@@ -375,11 +347,38 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
               </svg>
             </button>
           </div>
-          <input 
-            type="range" min="0" max="80" value={sliderValue}
-            onChange={(e) => setSliderValue(parseInt(e.target.value))}
-            style={{ width: '100%', cursor: 'pointer', accentColor: '#F97316' }} 
-          />
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
+                <span>Sep 1</span>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Day of Year</span>
+                <span>Nov 20</span>
+              </div>
+              <input 
+                type="range" min="0" max="80" value={sliderValue}
+                onChange={(e) => setSliderValue(parseInt(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer', accentColor: '#F97316' }} 
+              />
+            </div>
+            
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
+                <span>2015</span>
+                <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Historical Year</span>
+                <span>2026 Avg</span>
+              </div>
+              <input 
+                type="range" min="2015" max="2026" step="1" value={selectedYear}
+                onChange={(e) => {
+                  const newYear = parseInt(e.target.value);
+                  setSelectedYear(newYear);
+                  window.dispatchEvent(new CustomEvent('yearChanged', { detail: newYear }));
+                }}
+                style={{ width: '100%', cursor: 'pointer', accentColor: '#38bdf8' }} 
+              />
+            </div>
+          </div>
         </div>
       )}
 
