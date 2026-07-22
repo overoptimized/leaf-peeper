@@ -8,7 +8,7 @@ function getReadableDateFromDayOfYear(day) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const LocationDetails = ({ location, historicalPhenology }) => {
+const LocationDetails = ({ location, historicalPhenology, locationImages }) => {
   const { name, description, historicalPeak, currentStatus, nearbyCities, coordinates } = location;
   const { lat, lng } = coordinates;
 
@@ -60,6 +60,8 @@ const LocationDetails = ({ location, historicalPhenology }) => {
   const availableYears = historicalPhenology && historicalPhenology.yearlyPeaks 
     ? Object.keys(historicalPhenology.yearlyPeaks).sort((a,b) => b - a) 
     : [];
+    
+  const topImage = locationImages && locationImages.length > 0 ? locationImages[0] : null;
 
   return (
     <div 
@@ -72,19 +74,33 @@ const LocationDetails = ({ location, historicalPhenology }) => {
         maxHeight: 'calc(100vh - 48px)',
         overflowY: 'auto',
         zIndex: 1000,
-        padding: '24px',
+        padding: '0',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '0'
       }}
     >
-      <Breadcrumbs 
-        stateSlug={location.stateSlug} 
-        stateName={location.stateName} 
-        citySlug={location.citySlug} 
-        cityName={location.cityName}
-        locationName={name} 
-      />
+      {topImage && (
+        <div style={{ position: 'relative', width: '100%', height: '180px', flexShrink: 0 }}>
+          <img 
+            src={topImage.url} 
+            alt={topImage.title} 
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
+          />
+          <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', color: 'rgba(255,255,255,0.7)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Photo: {topImage.author} ({topImage.license})
+          </div>
+        </div>
+      )}
+      
+      <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <Breadcrumbs 
+          stateSlug={location.stateSlug} 
+          stateName={location.stateName} 
+          citySlug={location.citySlug} 
+          cityName={location.cityName}
+          locationName={name} 
+        />
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', marginTop: '-8px' }}>
         <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, letterSpacing: '-0.5px' }}>
           {name}
@@ -220,6 +236,7 @@ const LocationDetails = ({ location, historicalPhenology }) => {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
         Get Directions
       </button>
+      </div>
     </div>
   );
 };
