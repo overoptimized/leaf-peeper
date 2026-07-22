@@ -3,10 +3,15 @@ import Layout from '../../layouts/Layout.astro';
 import FoliageMap from '../../components/FoliageMap';
 import LocationDetails from '../../components/LocationDetails';
 import locations from '../../data/locations.json';
+import phenologyData from '../../data/historical-phenology.json';
+import locationImages from '../../data/location_images.json';
 
 const { slug } = Astro.params;
 const location = (locations as any[]).find((l: any) => l.slug === slug);
 if (!location) return Astro.redirect('/404');
+
+const historicalPhenology = (phenologyData as any)[location.slug] || null;
+const images = (locationImages as any)[location.slug] || [];
 ---
 
 <Layout
@@ -14,7 +19,15 @@ if (!location) return Astro.redirect('/404');
   description={location.description || `Track fall foliage conditions at ${location.name}. Get peak timing predictions, color reports, and trip planning tips.`}
 >
 	<main style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
-		<FoliageMap client:only="react" center={[location.coordinates.lat, location.coordinates.lng]} initialZoom={10} />
-		<LocationDetails client:load location={location} />
+		<FoliageMap
+      client:only="react"
+      center={[location.coordinates.lat, location.coordinates.lng]}
+      initialZoom={11}
+      routeGeoJSONUrl={location.hasRoute ? `/routes/location-${location.slug}.geojson` : undefined}
+      peakString={location.historicalPeak}
+      historicalPhenology={historicalPhenology}
+      poiSlug={location.slug}
+    />
+		<LocationDetails client:load location={location} historicalPhenology={historicalPhenology} locationImages={images} />
 	</main>
 </Layout>
