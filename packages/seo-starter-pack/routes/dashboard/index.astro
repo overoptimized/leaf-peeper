@@ -1,0 +1,51 @@
+---
+export const prerender = false;
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { env } from "cloudflare:workers";
+
+let snap = null, err = null;
+try {
+  const raw = await env.STATS.get("snapshot:meta");
+  if (raw) snap = JSON.parse(raw);
+} catch (e) { err = String(e); }
+
+const fmt = (ts: number) => new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+---
+
+<DashboardLayout title="Dashboard" subtitle="Site analytics and SEO health">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:2rem">
+
+    <a href="/dashboard/crawl-stats" style="text-decoration:none;color:inherit;border:1px solid var(--bd);border-radius:10px;padding:1rem 1.1rem;display:block">
+      <div style="font-size:1.4rem;margin-bottom:.3rem">📊</div>
+      <div style="font-weight:600;margin-bottom:.2rem">Crawl Stats</div>
+      <div style="font-size:.8rem;color:var(--mut)">Bot breakdown, traffic trends, path analysis, and group filters over time.</div>
+    </a>
+
+    <a href="/dashboard/crawl-surface" style="text-decoration:none;color:inherit;border:1px solid var(--bd);border-radius:10px;padding:1rem 1.1rem;display:block">
+      <div style="font-size:1.4rem;margin-bottom:.3rem">🗺️</div>
+      <div style="font-weight:600;margin-bottom:.2rem">Crawl Surface</div>
+      <div style="font-size:.8rem;color:var(--mut)">What machine-readable endpoints exist and who is accessing each layer.</div>
+    </a>
+
+    <a href="/dashboard/page-speed" style="text-decoration:none;color:inherit;border:1px solid var(--bd);border-radius:10px;padding:1rem 1.1rem;display:block">
+      <div style="font-size:1.4rem;margin-bottom:.3rem">⚡</div>
+      <div style="font-weight:600;margin-bottom:.2rem">Page Speed</div>
+      <div style="font-size:.8rem;color:var(--mut)">Real-user Core Web Vitals — p75 LCP, INP, CLS, FCP, TTFB with per-page breakdown.</div>
+    </a>
+
+  </div>
+
+  {snap && (
+    <div style="border:1px solid var(--bd);border-radius:10px;padding:.85rem 1rem">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:.6rem">Snapshot status</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem 2rem;font-size:.82rem">
+        <span>Last run: <strong>{snap.lastRun ? fmt(new Date(snap.lastRun).getTime()) : "—"}</strong></span>
+        <span>Rows processed: <strong>{snap.processedRows?.toLocaleString() ?? "—"}</strong></span>
+        <span>Bots tracked: <strong>{snap.botsTracked?.toLocaleString() ?? "—"}</strong></span>
+        <span>Paths indexed: <strong>{snap.pathsIndexed?.toLocaleString() ?? "—"}</strong></span>
+      </div>
+    </div>
+  )}
+  {err && <p style="color:#dc2626;font-size:.82rem;margin-top:1rem">KV error: {err}</p>}
+  {!snap && !err && <p style="color:var(--mut);font-size:.82rem;margin-top:1rem;font-style:italic">No snapshot data yet — run <code>/api/snapshot?key=…</code> to populate.</p>}
+</DashboardLayout>

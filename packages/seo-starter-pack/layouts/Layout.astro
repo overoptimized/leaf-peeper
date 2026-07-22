@@ -1,0 +1,367 @@
+---
+import SchemaInjector from "../components/SchemaInjector.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  pageType?: "WebPage" | "BlogPosting" | "AboutPage" | "ContactPage" | "CollectionPage" | "TechArticle";
+  datePublished?: string;
+  dateModified?: string;
+  noindex?: boolean;
+  noWidget?: boolean;
+}
+
+const {
+  title,
+  description = "Data Engineering, Fintech, and Lifestyle Optimization.",
+  image = "/default-og.jpg",
+  pageType = "WebPage",
+  datePublished,
+  dateModified,
+  noindex = false,
+  noWidget = false,
+} = Astro.props;
+
+// Generate clean canonical URL (strips trailing slashes)
+const canonicalURL = new URL(Astro.url.pathname, Astro.site || Astro.url).toString().replace(/\/$/, '');
+const canonicalURLWithSlash = canonicalURL.endsWith('/') ? canonicalURL : `${canonicalURL}/`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="alternate" type="application/rss+xml" title="Lee Driggers — Blog" href="/rss.xml" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+
+    <script is:inline>
+      (function () {
+        const stored = localStorage.getItem("theme");
+        if (stored === "dark" || stored === "light") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      })();
+    </script>
+
+    <title>{title} | Lee Driggers</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={new URL(image, Astro.url)} />
+
+    <SchemaInjector
+      pageType={pageType}
+      title={`${title} | Lee Driggers`}
+      description={description}
+      canonicalURL={canonicalURLWithSlash}
+      image={new URL(image, Astro.url).toString()}
+      datePublished={datePublished}
+      dateModified={dateModified}
+    />
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="/" class="logo">Lee Driggers</a>
+        <div class="links">
+          <a href="/about/">About</a>
+          <a href="/resume/">Resume</a>
+          <a href="/projects/">Projects</a>
+          <a href="/blog/">Blog</a>
+          <a href="/notes/">Notes</a>
+          <a href="/contact/">Contact</a>
+          <a href="/search/" aria-label="Search">&#x2315;</a>
+          <button id="theme-toggle" type="button" aria-label="Toggle dark mode">
+            <span class="theme-icon theme-icon-dark">☀︎</span>
+            <span class="theme-icon theme-icon-light">☽</span>
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <main data-pagefind-body={noindex ? undefined : ""} data-pagefind-ignore={noindex ? "" : undefined}>
+      <slot />
+    </main>
+
+    <footer>
+      <p>&copy; {new Date().getFullYear()} Lee Driggers</p>
+      <nav class="footer-links">
+        <a href="/blogroll/">Blogroll</a>
+        <a href="/stack/">Stack</a>
+        <a href="/uses/">Uses</a>
+        <a href="/notes/changelog/">Changelog</a>
+        <a href="/resume/">Resume</a>
+        <a href="/contact/">Contact</a>
+        <a href="/privacy/">Privacy</a>
+      </nav>
+      <div class="footer-social">
+        <a href="https://linkedin.com/in/leedriggers" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.59 0 4.26 2.37 4.26 5.44v6.3zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45C23.2 24 24 23.23 24 22.28V1.72C24 .77 23.2 0 22.22 0z"/></svg>
+        </a>
+        <a href="https://github.com/overoptimized" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.79 23.4c.6.1.83-.26.83-.57v-2.2c-3.34.72-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.75-1.33-1.75-1.08-.74.08-.73.08-.73 1.2.09 1.83 1.23 1.83 1.23 1.07 1.83 2.8 1.3 3.48 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.23 1.9 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .31.21.68.82.56A12 12 0 0 0 12 .3z"/></svg>
+        </a>
+        <a href="https://x.com/0ver0ptimized" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <a href="/rss.xml" aria-label="RSS Feed">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83c0-8.59-6.97-15.56-15.56-15.56zm0 5.66v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83c0-5.47-4.43-9.9-9.9-9.9z"/></svg>
+        </a>
+      </div>
+    </footer>
+    
+    <script is:inline>
+      (function () {
+        const btn = document.getElementById("theme-toggle");
+        btn.addEventListener("click", function () {
+          const current =
+            document.documentElement.getAttribute("data-theme") ||
+            (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          const next = current === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          localStorage.setItem("theme", next);
+          btn.setAttribute("aria-label", next === "dark" ? "Switch to light mode" : "Switch to dark mode");
+        });
+      })();
+    </script>
+
+    <script>
+      import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals';
+
+      const sendToAnalytics = (metric) => {
+        const body = JSON.stringify({
+          name: metric.name,
+          value: metric.value,
+          rating: metric.rating,
+          delta: metric.delta,
+          id: metric.id,
+          path: window.location.pathname
+        });
+
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/cwv', body);
+        } else {
+          fetch('/api/cwv', { body, method: 'POST', keepalive: true });
+        }
+      };
+
+      onCLS(sendToAnalytics);
+      onINP(sendToAnalytics);
+      onLCP(sendToAnalytics);
+      onFCP(sendToAnalytics);
+      onTTFB(sendToAnalytics);
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg: #ffffff;
+    --text: #111111;
+    --border: #e5e5e5;
+    --accent: #595959; /* Darkened slightly for WCAG AA compliance */
+    --p-text: #222222;
+  }
+
+  /* Automatic Dark Mode Support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111111;
+      --text: #f5f5f5;
+      --border: #333333;
+      --accent: #a3a3a3;
+      --p-text: #e5e5e5;
+    }
+  }
+
+  /* Manual override via toggle, takes precedence over OS preference */
+  :root[data-theme="light"] {
+    --bg: #ffffff;
+    --text: #111111;
+    --border: #e5e5e5;
+    --accent: #595959;
+    --p-text: #222222;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #111111;
+    --text: #f5f5f5;
+    --border: #333333;
+    --accent: #a3a3a3;
+    --p-text: #e5e5e5;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    padding: 2rem 1rem;
+    max-width: 680px;
+    margin: 0 auto;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border); /* Standardized with footer */
+    padding-bottom: 1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  nav a {
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 4px; /* Prep for focus state */
+  }
+
+  nav a.logo {
+    font-weight: 700;
+    font-size: 1.15rem;
+  }
+
+  .links {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  nav a:hover {
+    text-decoration: underline;
+  }
+
+  #theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.25rem 0.5rem;
+  }
+
+  #theme-toggle:hover {
+    border-color: var(--accent);
+  }
+
+  /* Sun shows in dark mode (click to go light); moon shows in light mode */
+  .theme-icon-dark { display: none; }
+  .theme-icon-light { display: inline; }
+
+  @media (prefers-color-scheme: dark) {
+    .theme-icon-dark { display: inline; }
+    .theme-icon-light { display: none; }
+  }
+
+  :root[data-theme="dark"] .theme-icon-dark { display: inline; }
+  :root[data-theme="dark"] .theme-icon-light { display: none; }
+  :root[data-theme="light"] .theme-icon-dark { display: none; }
+  :root[data-theme="light"] .theme-icon-light { display: inline; }
+
+  /* Keyboard Accessibility */
+  a:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+
+  main {
+    min-height: 55vh;
+  }
+
+  footer {
+    margin-top: 5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--accent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  footer p {
+    margin-bottom: 0;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1.25rem;
+  }
+
+  .footer-links a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer-links a:hover {
+    text-decoration: underline;
+  }
+
+  .footer-social {
+    display: flex;
+    gap: .75rem;
+    align-items: center;
+  }
+
+  .footer-social a {
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    opacity: .7;
+    transition: opacity .15s;
+  }
+
+  .footer-social a:hover {
+    opacity: 1;
+  }
+
+  h1, h2, h3 {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.02em;
+  }
+  
+  p { 
+    margin-bottom: 1.25rem; 
+    color: var(--p-text);
+  }
+
+  ul {
+    margin-bottom: 1.25rem;
+    padding-left: 1.25rem;
+  }
+
+  li {
+    margin-bottom: 0.5rem;
+  }
+
+  a {
+    color: var(--text);
+  }
+</style>

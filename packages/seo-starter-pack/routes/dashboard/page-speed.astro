@@ -1,0 +1,302 @@
+---
+export const prerender = false;
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { env } from "cloudflare:workers";
+
+const METRICS = ["LCP", "INP", "CLS", "FCP", "TTFB"] as const;
+type Metric = typeof METRICS[number];
+
+const LABELS: Record<Metric, { name: string; unit: string; fmt: (v: number | null) => string }> = {
+  LCP:  { name: "Largest Contentful Paint", unit: "ms",  fmt: (v) => v == null ? "—" : `${Math.round(v).toLocaleString()}ms` },
+  INP:  { name: "Interaction to Next Paint", unit: "ms", fmt: (v) => v == null ? "—" : `${Math.round(v).toLocaleString()}ms` },
+  CLS:  { name: "Cumulative Layout Shift",  unit: "",    fmt: (v) => v == null ? "—" : (v as number).toFixed(3) },
+  FCP:  { name: "First Contentful Paint",   unit: "ms",  fmt: (v) => v == null ? "—" : `${Math.round(v).toLocaleString()}ms` },
+  TTFB: { name: "Time to First Byte",       unit: "ms",  fmt: (v) => v == null ? "—" : `${Math.round(v).toLocaleString()}ms` },
+};
+
+const RATING_COLOR: Record<string, string> = { good: "#22c55e", ni: "#f59e0b", poor: "#ef4444" };
+const RATING_LABEL: Record<string, string>  = { good: "Good", ni: "Needs improvement", poor: "Poor" };
+
+const THRESHOLDS: Record<Metric, { good: number; poor: number }> = {
+  LCP:  { good: 2500, poor: 4000  },
+  INP:  { good: 200,  poor: 500   },
+  CLS:  { good: 0.1,  poor: 0.25  },
+  FCP:  { good: 1800, poor: 3000  },
+  TTFB: { good: 800,  poor: 1800  },
+};
+
+function p75Rating(m: Metric, v: number | null): string {
+  if (v == null) return "unknown";
+  const t = THRESHOLDS[m];
+  return v <= t.good ? "good" : v <= t.poor ? "ni" : "poor";
+}
+
+const [totalsRaw, dailyRaw, byPathRaw] = await Promise.all([
+  env.STATS.get("cwv:totals"),
+  env.STATS.get("cwv:daily"),
+  env.STATS.get("cwv:by-path"),
+]);
+
+const totals: Record<string, any> = totalsRaw ? JSON.parse(totalsRaw) : {};
+const daily:  Record<string, any> = dailyRaw  ? JSON.parse(dailyRaw)  : {};
+const byPath: Record<string, any> = byPathRaw ? JSON.parse(byPathRaw) : {};
+
+const kvAvailable = Object.keys(totals).length > 0;
+
+const q    = Astro.url.searchParams;
+const days = Math.min(Math.max(parseInt(q.get("days") || "30"), 1), 90);
+
+const dayKeys: string[] = [];
+for (let i = days - 1; i >= 0; i--)
+  dayKeys.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+
+// Daily averages per metric
+const dailyAvg = dayKeys.map(d => {
+  const bucket = daily[d] || {};
+  const row: Record<string, number | null> = { day: 0 };
+  for (const m of METRICS)
+    row[m] = bucket[m]?.count ? bucket[m].sum / bucket[m].count : null;
+  return { day: d, ...row } as { day: string } & Record<Metric, number | null>;
+});
+
+const pathRanked = Object.entries(byPath)
+  .filter(([, d]: [string, any]) => d.LCP?.count >= 2)
+  .map(([path, d]: [string, any]) => ({
+    path,
+    LCP:  { avg: d.LCP  ? d.LCP.sum  / d.LCP.count  : null, count: d.LCP?.count  || 0, ratings: d.LCP?.ratings  || {} },
+    INP:  { avg: d.INP  ? d.INP.sum  / d.INP.count  : null, count: d.INP?.count  || 0, ratings: d.INP?.ratings  || {} },
+    CLS:  { avg: d.CLS  ? d.CLS.sum  / d.CLS.count  : null, count: d.CLS?.count  || 0, ratings: d.CLS?.ratings  || {} },
+    TTFB: { avg: d.TTFB ? d.TTFB.sum / d.TTFB.count : null, count: d.TTFB?.count || 0, ratings: d.TTFB?.ratings || {} },
+  }))
+  .sort((a, b) => (b.LCP.avg || 0) - (a.LCP.avg || 0));
+
+const fmtDay = (s: string) => s.slice(5);
+const fmtMs  = (v: number | null) => v == null ? "—" : `${Math.round(v).toLocaleString()}ms`;
+const fmtCLS = (v: number | null) => v == null ? "—" : (v as number).toFixed(3);
+
+function ratingRows(t: any): { k: string; n: number }[] {
+  return [
+    { k: "good", n: t.ratings?.good || 0 },
+    { k: "ni",   n: t.ratings?.ni   || 0 },
+    { k: "poor", n: t.ratings?.poor || 0 },
+  ];
+}
+
+// Trend chart helpers
+const CW = 340, CH = 100, CPAD = 20;
+function trendPoints(m: Metric, maxVal: number): string {
+  return dailyAvg
+    .map((d, i) => {
+      const v = d[m];
+      if (v == null) return null;
+      const x = CPAD + i * ((CW - CPAD * 2) / Math.max(dayKeys.length - 1, 1));
+      const y = CH - CPAD - (v / maxVal) * (CH - CPAD * 2);
+      return `${x},${y}`;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+function trendDots(m: Metric, maxVal: number) {
+  return dailyAvg.map((d, i) => {
+    const v = d[m];
+    if (v == null) return null;
+    const x = CPAD + i * ((CW - CPAD * 2) / Math.max(dayKeys.length - 1, 1));
+    const y = CH - CPAD - (v / maxVal) * (CH - CPAD * 2);
+    return { x, y, v, rat: p75Rating(m, v) };
+  }).filter(Boolean) as Array<{x:number; y:number; v:number; rat:string}>;
+}
+---
+
+<DashboardLayout title="Page Speed">
+  <style>
+    /* override body max-width for this dashboard page */
+    :global(body) { max-width: 1100px !important; }
+
+    .ps-header { margin-bottom: 1.2rem; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+    .ps-header h1 { font-size: 1.3rem; margin: 0; }
+    .ps-sub { color: var(--accent); font-size: .85rem; margin: .15rem 0 1.2rem; }
+    .warn { background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; padding: .6rem .9rem; font-size: .83rem; color: #854d0e; margin-bottom: 1rem; }
+    @media (prefers-color-scheme: dark) { .warn { background: #422006; border-color: #92400e; color: #fde68a; } }
+    /* day filter */
+    .filters { display: flex; gap: .4rem; margin-bottom: 1.2rem; }
+    .filters a { text-decoration: none; padding: .25rem .65rem; border: 1px solid var(--border); border-radius: 6px; font-size: .82rem; color: var(--accent); }
+    .filters a.on { background: #2563eb; color: #fff !important; border-color: #2563eb; }
+    /* metric cards */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .7rem; margin-bottom: 1.6rem; }
+    .metric-card { border: 1px solid var(--border); border-radius: 10px; padding: .75rem .9rem; }
+    .metric-card.good { border-color: #86efac; }
+    .metric-card.ni   { border-color: #fcd34d; }
+    .metric-card.poor { border-color: #fca5a5; }
+    @media (prefers-color-scheme: dark) {
+      .metric-card.good { border-color: #166534; }
+      .metric-card.ni   { border-color: #92400e; }
+      .metric-card.poor { border-color: #991b1b; }
+    }
+    .metric-name { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); margin-bottom: .2rem; }
+    .metric-p75 { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    .metric-p75.good { color: #16a34a; }
+    .metric-p75.ni   { color: #d97706; }
+    .metric-p75.poor { color: #dc2626; }
+    .metric-full { font-size: .72rem; color: var(--accent); margin-bottom: .5rem; }
+    /* rating bar */
+    .rbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin: .5rem 0 .3rem; gap: 1px; }
+    .rbar-seg { flex: 0 0 auto; }
+    /* rating breakdown rows */
+    .rating-breakdown { display: flex; flex-direction: column; gap: .2rem; margin: .3rem 0 .4rem; }
+    .rb-row { display: flex; align-items: center; gap: .4rem; font-size: .72rem; }
+    .rb-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .rb-label { color: var(--accent); width: 6rem; }
+    .rb-count { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 2.5rem; }
+    .rb-pct { color: var(--accent); font-size: .68rem; }
+    /* percentile row */
+    .pct-row { display: flex; gap: 1rem; font-size: .73rem; color: var(--accent); margin-top: .3rem; padding-top: .3rem; border-top: 1px solid var(--border); }
+    /* trend chart grid */
+    .trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: .7rem; margin-bottom: 1.6rem; }
+    .trend-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .trend-title { font-size: .78rem; font-weight: 600; padding: .5rem .75rem .1rem; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+    .trend-card svg { display: block; width: 100%; height: auto; }
+    /* table */
+    .section-head { font-size: .95rem; font-weight: 600; margin: 1.6rem 0 .6rem; }
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { color: var(--accent); font-weight: 600; font-size: .72rem; text-transform: uppercase; }
+    td.wrap { white-space: normal; word-break: break-all; max-width: 260px; }
+    code { background: #88888822; padding: 0 .25rem; border-radius: 3px; font-size: .92em; }
+    .rc { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+    .crawl-link { font-size: .82rem; text-decoration: none; color: var(--accent) !important; border: 1px solid var(--border); border-radius: 6px; padding: .3rem .7rem; }
+    .crawl-link:hover { border-color: #2563eb; color: #2563eb !important; }
+  </style>
+
+  <div class="ps-header">
+    <div>
+      <h1>Page Speed</h1>
+      <p class="ps-sub">Real-user Core Web Vitals from KV snapshot · p75 values</p>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a class="crawl-link" href="/dashboard/crawl-stats/">← Crawl Stats</a>
+      <a class="crawl-link" href="/dashboard/crawl-surface/">Crawl Surface →</a>
+    </div>
+  </div>
+
+  {!kvAvailable && (
+    <div class="warn">KV snapshot not yet populated — run <code>/api/cwv-snapshot?key=…</code> to seed it.</div>
+  )}
+
+  <div class="filters">
+    {[7, 14, 30, 60, 90].map(d => (
+      <a href={`?days=${d}`} class={d === days ? "on" : ""}>{d}d</a>
+    ))}
+  </div>
+
+  {kvAvailable && (
+    <>
+      {/* ── p75 metric cards ─────────────────────────────────────────── */}
+      <div class="metric-grid">
+        {METRICS.map(m => {
+          const t = totals[m] || {};
+          const rat = p75Rating(m, t.p75);
+          const rows = ratingRows(t);
+          const total = rows.reduce((s, r) => s + r.n, 0);
+          const pct = (n: number) => total ? Math.round(n / total * 100) : 0;
+          return (
+            <div class={`metric-card ${rat}`} id={m}>
+              <div class="metric-name">{m}</div>
+              <div class={`metric-p75 ${rat}`}>{LABELS[m].fmt(t.p75)}</div>
+              <div class="metric-full">{LABELS[m].name}</div>
+              <div class="rbar">
+                {rows.map(({ k, n }) => (
+                  <div class="rbar-seg" style={`width:${pct(n)}%;background:${RATING_COLOR[k]}`}></div>
+                ))}
+              </div>
+              <div class="rating-breakdown">
+                {rows.map(({ k, n }) => (
+                  <div class="rb-row">
+                    <span class="rb-dot" style={`background:${RATING_COLOR[k]}`}></span>
+                    <span class="rb-label">{RATING_LABEL[k]}</span>
+                    <span class="rb-count">{n.toLocaleString()}</span>
+                    <span class="rb-pct">{pct(n)}%</span>
+                  </div>
+                ))}
+              </div>
+              <div class="pct-row">
+                <span>p50 <b>{LABELS[m].fmt(t.p50)}</b></span>
+                <span>p95 <b>{LABELS[m].fmt(t.p95)}</b></span>
+                <span>{(t.count || 0).toLocaleString()} samples</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── per-metric trend charts ───────────────────────────────────── */}
+      <div class="trend-grid">
+        {METRICS.map(m => {
+          const maxVal = Math.max(1, ...dailyAvg.map(d => (d[m] as number | null) || 0));
+          const pts = trendPoints(m, maxVal);
+          const dots = trendDots(m, maxVal);
+          const threshGood = THRESHOLDS[m].good;
+          const threshPoor = THRESHOLDS[m].poor;
+          const yGood = CH - CPAD - (threshGood / maxVal) * (CH - CPAD * 2);
+          const yPoor = CH - CPAD - (threshPoor / maxVal) * (CH - CPAD * 2);
+          return (
+            <div class="trend-card">
+              <div class="trend-title">{m} — {LABELS[m].name}</div>
+              <svg viewBox={`0 0 ${CW} ${CH}`}>
+                {yGood > CPAD && yGood < CH - CPAD && (
+                  <line x1={CPAD} y1={yGood} x2={CW - CPAD} y2={yGood} stroke="#22c55e" stroke-width="1" stroke-dasharray="3 2" opacity=".5" />
+                )}
+                {yPoor > CPAD && yPoor < CH - CPAD && (
+                  <line x1={CPAD} y1={yPoor} x2={CW - CPAD} y2={yPoor} stroke="#ef4444" stroke-width="1" stroke-dasharray="3 2" opacity=".5" />
+                )}
+                {pts.length > 0 && (
+                  <polyline points={pts} fill="none" stroke="#94a3b8" stroke-width="1.5" opacity=".6" />
+                )}
+                {dots.map(({ x, y, rat }) => (
+                  <circle cx={x} cy={y} r="3" fill={RATING_COLOR[rat]} />
+                ))}
+                {dayKeys.map((d, i) => i % Math.ceil(dayKeys.length / 6) === 0 ? (
+                  <text x={CPAD + i * ((CW - CPAD * 2) / Math.max(dayKeys.length - 1, 1))} y={CH - CPAD + 12} font-size="8" fill="var(--accent)" text-anchor="middle">{fmtDay(d)}</text>
+                ) : null)}
+                <line x1={CPAD} y1={CH - CPAD} x2={CW - CPAD} y2={CH - CPAD} stroke="var(--border)" stroke-width="1" />
+              </svg>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── per-path table ────────────────────────────────────────────── */}
+      {pathRanked.length > 0 && (
+        <>
+          <p class="section-head">By page — sorted by slowest LCP (avg, all time)</p>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Path</th>
+                  <th>LCP avg</th>
+                  <th>INP avg</th>
+                  <th>CLS avg</th>
+                  <th>TTFB avg</th>
+                  <th>n</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pathRanked.map(({ path, LCP, INP, CLS, TTFB }) => (
+                  <tr>
+                    <td class="wrap"><code>{path}</code></td>
+                    <td><i class="rc" style={`background:${RATING_COLOR[p75Rating("LCP", LCP.avg)]}`}></i>{" "}{fmtMs(LCP.avg)}</td>
+                    <td><i class="rc" style={`background:${RATING_COLOR[p75Rating("INP", INP.avg)]}`}></i>{" "}{fmtMs(INP.avg)}</td>
+                    <td><i class="rc" style={`background:${RATING_COLOR[p75Rating("CLS", CLS.avg)]}`}></i>{" "}{fmtCLS(CLS.avg)}</td>
+                    <td><i class="rc" style={`background:${RATING_COLOR[p75Rating("TTFB", TTFB.avg)]}`}></i>{" "}{fmtMs(TTFB.avg)}</td>
+                    <td style="color:var(--accent)">{LCP.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
+  )}
+</DashboardLayout>

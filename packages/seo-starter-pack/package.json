@@ -1,0 +1,20 @@
+{
+  "name": "seo-starter-pack",
+  "version": "1.0.0",
+  "description": "SEO & Telemetry Starter Pack",
+  "type": "module",
+  "main": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./middleware": "./middleware.js",
+    "./components/*": "./components/*",
+    "./routes/*": "./routes/*",
+    "./schema.sql": "./schema.sql"
+  },
+  "dependencies": {
+    "web-vitals": "^6.0.0"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0"
+  }
+}

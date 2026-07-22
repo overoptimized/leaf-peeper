@@ -1,0 +1,232 @@
+---
+export const prerender = false;
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Entity Map" description="Structured entity map for leedriggers.com — people, concepts, and organizations in machine-readable and human-readable form.">
+  <style>
+    h1 { margin-bottom: .35rem; }
+    .subtitle { color: var(--accent); font-size: .88rem; margin-bottom: 2rem; }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2.5rem;
+      font-size: .8rem;
+      color: var(--accent);
+    }
+    .meta-row a {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: .75rem;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: .15rem .5rem;
+      text-decoration: none;
+    }
+    .meta-row a:hover { border-color: var(--accent); color: var(--text); }
+
+    .entity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .entity {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+    }
+    .entity-header {
+      display: flex;
+      align-items: baseline;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-bottom: .45rem;
+    }
+    .entity-name {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .entity-type {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: .1rem .4rem;
+    }
+    .entity-id {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: .68rem;
+      color: var(--accent);
+      opacity: .6;
+    }
+    .entity-desc {
+      font-size: .83rem;
+      color: var(--accent);
+      line-height: 1.55;
+      margin-bottom: .75rem;
+    }
+    .entity-relations {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+    }
+    .relation-chip {
+      font-size: .72rem;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: .1rem .55rem;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+    }
+    .relation-chip .pred { opacity: .6; }
+
+    .section-label {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: .72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--accent);
+      margin: 2rem 0 .85rem;
+      display: block;
+    }
+
+    .spec-note {
+      font-size: .78rem;
+      color: var(--accent);
+      margin-top: 2.5rem;
+    }
+    .spec-note a { color: var(--accent); }
+  </style>
+
+  <h1>Entity Map</h1>
+  <p class="subtitle">Structured entity declarations for leedriggers.com — who I am, what I've built, and the concepts I work with.</p>
+
+  <div class="meta-row">
+    <span>v1.0 · self-declared</span>
+    <a href="/entitymap.json">entitymap.json ↗</a>
+    <a href="https://entitymap.org/spec/v1.0" target="_blank" rel="noopener">spec ↗</a>
+  </div>
+
+  <span class="section-label">Entities</span>
+
+  <div class="entity-list">
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Lee Driggers</span>
+        <span class="entity-type">Person</span>
+        <span class="entity-id">e_001</span>
+      </div>
+      <p class="entity-desc">SEO and technical strategy professional based in San Francisco. Background in large-scale search programs across real estate, personal finance, and ed tech. Previously Bankrate, HomeLight, Chegg, and BrightEdge. Trail runner — JMT, Wonderland Trail, CCC at UTMB, multiple 100Ks.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">AFFILIATED_WITH →</span> leedriggers.com</span>
+        <span class="relation-chip"><span class="pred">AUTHORED_BY →</span> Crawl Intelligence</span>
+        <span class="relation-chip"><span class="pred">AUTHORED_BY →</span> Edge SEO Architecture</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">leedriggers.com</span>
+        <span class="entity-type">Organization</span>
+        <span class="entity-id">e_002</span>
+      </div>
+      <p class="entity-desc">Personal website and technical portfolio of Lee Driggers. Built on Astro 5 with Cloudflare Workers SSR. Includes a live crawl intelligence pipeline tracking bot and AI crawler activity, and a real user monitoring dashboard for Core Web Vitals.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">PRODUCED_BY →</span> Lee Driggers</span>
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Crawl Intelligence</span>
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Real User Monitoring</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Crawl Intelligence</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_003</span>
+      </div>
+      <p class="entity-desc">A self-hosted pipeline for tracking and classifying web crawler and bot activity at the CDN edge. Requests are intercepted by Cloudflare Worker middleware, logged to D1 with UA string, path, country, and ASN, then aggregated by a scheduled snapshot job into Cloudflare KV. Public dashboards show which search engines, AI crawlers, and autonomous agents are accessing the site, at what frequency, and on which pages.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Edge SEO Architecture</span>
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Bot Classification</span>
+        <span class="relation-chip"><span class="pred">PRODUCED_BY →</span> Lee Driggers</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Edge SEO Architecture</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_004</span>
+      </div>
+      <p class="entity-desc">The practice of running SEO-relevant logic — bot logging, request classification, content negotiation, structured data injection — directly at the CDN edge. Enables real-time intelligence without round trips to origin and zero-latency dashboard reads via KV.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">DEPENDS_ON →</span> Crawl Intelligence</span>
+        <span class="relation-chip"><span class="pred">RELATES_TO →</span> Technical SEO</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Real User Monitoring</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_005</span>
+      </div>
+      <p class="entity-desc">Measurement of Core Web Vitals (LCP, INP, CLS, FCP, TTFB) from real browser sessions using the web-vitals library. Metrics are beaconed via sendBeacon to /api/cwv, stored in Cloudflare D1, and aggregated into p50/p75/p95 percentiles in Cloudflare KV. Surfaced on a public Page Speed dashboard with per-path breakdowns.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">PART_OF →</span> leedriggers.com</span>
+        <span class="relation-chip"><span class="pred">RELATES_TO →</span> Technical SEO</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Bot Classification</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_006</span>
+      </div>
+      <p class="entity-desc">A UA-string-first classification system that maps crawler user-agent strings and ASN identifiers to named bot groups: search engines, AI crawlers, SEO tools, social fetchers, scanners, headless browsers, developer tools, and unknown bots.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">PART_OF →</span> Crawl Intelligence</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Technical SEO</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_007</span>
+      </div>
+      <p class="entity-desc">The discipline of optimising website infrastructure, crawlability, and data architecture to improve search engine visibility and indexation. Encompasses site speed, structured data, crawl budget management, log file analysis, and the technical systems that underpin organic search performance.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Crawl Intelligence</span>
+        <span class="relation-chip"><span class="pred">INCLUDES →</span> Real User Monitoring</span>
+        <span class="relation-chip"><span class="pred">AUTHORED_BY →</span> Lee Driggers</span>
+      </div>
+    </div>
+
+    <div class="entity">
+      <div class="entity-header">
+        <span class="entity-name">Ultra Running</span>
+        <span class="entity-type">Concept</span>
+        <span class="entity-id">e_008</span>
+      </div>
+      <p class="entity-desc">Long-distance trail and mountain running beyond the marathon distance. Completed races and routes include the John Muir Trail (211 miles), the Wonderland Trail (93 miles), the CCC (101km) at UTMB week in Chamonix, multiple 100Ks including Cuyamaca, Siskiyou Out Back, and Miwok, and the TRT 50 Mile, Broken Arrow 52K and 26K.</p>
+      <div class="entity-relations">
+        <span class="relation-chip"><span class="pred">AFFILIATED_WITH →</span> Lee Driggers</span>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="spec-note">Conforms to <a href="https://entitymap.org/spec/v1.0" target="_blank" rel="noopener">EntityMap v1.0</a> · <a href="/entitymap.json">Raw JSON</a></p>
+</Layout>

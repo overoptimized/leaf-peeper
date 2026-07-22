@@ -1,0 +1,303 @@
+---
+export const prerender = false;
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { colorFor } from "../../lib/botClassify.js";
+import { env } from "cloudflare:workers";
+
+Astro.response.headers.set("cache-control", "public, max-age=900, s-maxage=3600");
+
+// Machine-readable surface layers — what we expose and who uses each
+const SURFACE_LAYERS = [
+  {
+    id: "discovery",
+    label: "Discovery layer",
+    desc: "Standard files every crawler checks first",
+    color: "#4285f4",
+    paths: [
+      { path: "/robots.txt",       label: "robots.txt",       desc: "Crawl rules + Content-Signal permissions" },
+      { path: "/sitemap-main.xml", label: "sitemap-main.xml", desc: "Canonical sitemap (linked from robots.txt)" },
+    ],
+  },
+  {
+    id: "ai-context",
+    label: "AI context layer",
+    desc: "Structured hints for LLMs and AI agents",
+    color: "#10a37f",
+    paths: [
+      { path: "/llms.txt",        label: "llms.txt",        desc: "LLM-readable site index (llmstxt.org spec)" },
+      { path: "/ai-catalog.json", label: "ai-catalog.json", desc: "Machine-readable endpoint catalog (JSON-LD)" },
+      { path: "/entitymap.json",  label: "entitymap.json",  desc: "Entity map — people, concepts, and organizations (EntityMap v1.0)" },
+    ],
+  },
+  {
+    id: "raw-content",
+    label: "Raw content layer",
+    desc: ".md / .mdx page requests — AI agents preferring plain text",
+    color: "#f59e0b",
+    paths: [], // populated dynamically from KV
+    dynamic: true,
+  },
+];
+
+const ALL_TRACKED_PATHS = new Set(
+  SURFACE_LAYERS.flatMap(l => l.paths.map(p => p.path))
+);
+
+// Read from KV — same pattern as crawl-stats, snapshot.js maintains these
+let aiPathsRaw = null, aiPathsDailyRaw = null, err = null;
+try {
+  [aiPathsRaw, aiPathsDailyRaw] = await Promise.all([
+    env.STATS.get("snapshot:ai-paths"),
+    env.STATS.get("snapshot:ai-paths-daily"),
+  ]);
+} catch (e) { err = e.message; }
+
+// { path: { bot: { hits, firstSeen, lastSeen } } }
+const aiPaths: Record<string, Record<string, { hits: number; firstSeen: number; lastSeen: number }>> =
+  aiPathsRaw ? JSON.parse(aiPathsRaw) : {};
+// { path: { date: { bot: count } } }
+const aiPathsDaily: Record<string, Record<string, Record<string, number>>> =
+  aiPathsDailyRaw ? JSON.parse(aiPathsDailyRaw) : {};
+
+// Compute per-path summaries
+function pathSummary(path: string) {
+  const bots = aiPaths[path] || {};
+  const total = Object.values(bots).reduce((s, e) => s + e.hits, 0);
+  const botsRanked = Object.entries(bots)
+    .sort((a, z) => z[1].hits - a[1].hits);
+  const firstSeen = botsRanked.length
+    ? Math.min(...botsRanked.map(([, e]) => e.firstSeen))
+    : null;
+  const lastSeen = botsRanked.length
+    ? Math.max(...botsRanked.map(([, e]) => e.lastSeen))
+    : null;
+  return { total, bots: botsRanked, firstSeen, lastSeen };
+}
+
+// Dynamic .md paths
+const mdPaths = Object.keys(aiPaths)
+  .filter(p => (p.endsWith('.md') || p.endsWith('.mdx')) && !ALL_TRACKED_PATHS.has(p))
+  .map(p => ({ path: p, ...pathSummary(p) }))
+  .sort((a, b) => b.total - a.total)
+  .slice(0, 15);
+
+// Overall stats
+const totalHits = Object.values(aiPaths)
+  .reduce((s, bots) => s + Object.values(bots).reduce((a, e) => a + e.hits, 0), 0);
+
+const botTotals: Record<string, number> = {};
+for (const bots of Object.values(aiPaths)) {
+  for (const [bot, e] of Object.entries(bots)) {
+    botTotals[bot] = (botTotals[bot] || 0) + e.hits;
+  }
+}
+const topBots = Object.entries(botTotals).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+const uniquePaths = Object.keys(aiPaths).length;
+const lastActivity = Object.values(aiPaths).flatMap(bots => Object.values(bots).map(e => e.lastSeen));
+const lastSeen = lastActivity.length ? Math.max(...lastActivity) : null;
+
+// 30-day trend: aggregate across all AI paths per day
+const DAYS = 30;
+const today = new Date();
+const dayKeys: string[] = [];
+for (let i = DAYS - 1; i >= 0; i--) {
+  const d = new Date(today); d.setDate(d.getDate() - i);
+  dayKeys.push(d.toISOString().slice(0, 10));
+}
+
+const dailyTotals: Record<string, Record<string, number>> = {};
+for (const [, dateBots] of Object.entries(aiPathsDaily)) {
+  for (const [date, bots] of Object.entries(dateBots)) {
+    if (!dailyTotals[date]) dailyTotals[date] = {};
+    for (const [bot, count] of Object.entries(bots)) {
+      dailyTotals[date][bot] = (dailyTotals[date][bot] || 0) + count;
+    }
+  }
+}
+
+const topTrendBots = topBots.slice(0, 6).map(([b]) => b);
+const maxDay = Math.max(1, ...dayKeys.map(d =>
+  Object.values(dailyTotals[d] || {}).reduce((a, c) => a + c, 0)
+));
+
+const fmtAgo = (ts: number) => {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+const fmtDate = (ts: number) => new Date(ts).toISOString().slice(0, 10);
+
+const W = 700, H = 140, PAD = 24;
+const barW = (W - PAD * 2) / dayKeys.length;
+---
+
+<DashboardLayout title="Crawl Surface">
+  <style>
+    .hero { margin: 2rem 0 1.5rem; }
+    .hero h1 { font-size: 1.6rem; margin: 0 0 .4rem; }
+    .hero p  { color: var(--accent); max-width: 60ch; margin: 0; line-height: 1.6; }
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .6rem; margin: 1.5rem 0; }
+    .stat { border: 1px solid var(--border); border-radius: 10px; padding: .65rem .9rem; }
+    .stat .n { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat .l { font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; color: var(--accent); }
+    .layer { margin: 2rem 0; }
+    .layer-head { display: flex; align-items: baseline; gap: .7rem; margin-bottom: .75rem; padding-bottom: .35rem; border-bottom: 2px solid; }
+    .layer-head h2 { font-size: 1rem; margin: 0; }
+    .layer-head p  { font-size: .78rem; color: var(--accent); margin: 0; }
+    .path-cards { display: grid; gap: .75rem; }
+    .path-card  { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .path-head  { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .5rem; padding: .5rem .85rem; background: color-mix(in srgb, var(--text) 5%, transparent); border-bottom: 1px solid var(--border); }
+    .path-label { font-family: ui-monospace, monospace; font-size: .85rem; font-weight: 600; }
+    .path-desc  { font-size: .72rem; color: var(--accent); margin-top: .1rem; }
+    .path-meta  { font-size: .72rem; color: var(--accent); text-align: right; white-space: nowrap; }
+    .path-body  { padding: .5rem .85rem; }
+    .path-empty { padding: .5rem .85rem; font-size: .8rem; font-style: italic; color: var(--accent); }
+    .bot-row { display: grid; grid-template-columns: 160px 1fr 48px; align-items: center; gap: .5rem; padding: .2rem 0; }
+    .chip { display: inline-block; padding: .05rem .5rem; border-radius: 99px; font-size: .72rem; color: #fff; white-space: nowrap; }
+    .bar  { height: 13px; border-radius: 3px; min-width: 2px; }
+    .count { text-align: right; font-variant-numeric: tabular-nums; font-size: .78rem; color: var(--accent); }
+    .top-bots { display: flex; flex-direction: column; gap: .25rem; margin: 1rem 0 2rem; }
+    .about { font-size: .82rem; color: var(--accent); line-height: 1.65; max-width: 65ch; margin-top: 2rem; }
+    .about a { color: inherit; }
+    .legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin-bottom: .35rem; font-size: .73rem; }
+    .legend span { display: inline-flex; align-items: center; gap: .3rem; }
+    .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    @media (max-width: 600px) { .bot-row { grid-template-columns: 120px 1fr 36px; } }
+  </style>
+
+  <div class="hero">
+    <h1>Crawl Surface</h1>
+    <p>
+      The machine-readable surface of this site — discovery files, AI context endpoints,
+      and structured data — and which crawlers access each layer.
+      Updated every 4 hours from the crawl log; owner traffic excluded.
+    </p>
+  </div>
+
+  {err && <p style="color:#dc2626;font-size:.85rem">KV error: {err}</p>}
+
+  <div class="stat-row">
+    <div class="stat"><div class="n">{totalHits.toLocaleString()}</div><div class="l">Total requests</div></div>
+    <div class="stat"><div class="n">{topBots.length}</div><div class="l">Distinct crawlers</div></div>
+    <div class="stat"><div class="n">{uniquePaths}</div><div class="l">Endpoint types</div></div>
+    <div class="stat">
+      <div class="n" style="font-size:1rem">{lastSeen ? fmtAgo(lastSeen) : "—"}</div>
+      <div class="l">Last access</div>
+    </div>
+  </div>
+
+  {totalHits > 0 && (
+    <>
+      <div class="legend">
+        {topTrendBots.map(b => <span><i class="sw" style={`background:${colorFor(b)}`}></i>{b}</span>)}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style="width:100%;height:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:1.5rem">
+        {dayKeys.map((d, i) => {
+          const bucket = dailyTotals[d] || {};
+          let yc = H - PAD;
+          const x = PAD + i * barW;
+          return (
+            <>
+              {topTrendBots.map(b => {
+                const c = bucket[b] || 0;
+                const h = (c / maxDay) * (H - PAD * 2);
+                yc -= h;
+                return c > 0 ? <rect x={x+1} y={yc} width={barW-2} height={h} fill={colorFor(b)} /> : null;
+              })}
+              {i % Math.ceil(dayKeys.length / 10) === 0 && (
+                <text x={x + barW/2} y={H-PAD+13} font-size="8" fill="var(--accent)" text-anchor="middle">{d.slice(5)}</text>
+              )}
+            </>
+          );
+        })}
+        <line x1={PAD} y1={H-PAD} x2={W-PAD} y2={H-PAD} stroke="var(--border)" />
+      </svg>
+    </>
+  )}
+
+  {SURFACE_LAYERS.map(layer => {
+    const layerPaths = layer.dynamic
+      ? mdPaths.map(p => ({ path: p.path, label: p.path, desc: `${p.total} requests` }))
+      : layer.paths;
+    if (layer.dynamic && mdPaths.length === 0) return null;
+    return (
+      <div class="layer">
+        <div class="layer-head" style={`border-color:${layer.color}`}>
+          <h2 style={`color:${layer.color}`}>{layer.label}</h2>
+          <p>{layer.desc}</p>
+        </div>
+        <div class="path-cards">
+          {layerPaths.map(({ path, label, desc }) => {
+            const s = pathSummary(path);
+            return (
+              <div class="path-card">
+                <div class="path-head">
+                  <div>
+                    <div class="path-label"><a href={path} style="text-decoration:none;color:inherit">{label}</a></div>
+                    <div class="path-desc">{desc}</div>
+                  </div>
+                  <div class="path-meta">
+                    {s.total > 0
+                      ? <>{s.total.toLocaleString()} requests{s.lastSeen ? <> · last {fmtAgo(s.lastSeen)}</> : null}</>
+                      : <em>no requests yet</em>
+                    }
+                  </div>
+                </div>
+                {s.total === 0 ? (
+                  <div class="path-empty">Not yet requested in the tracked window.</div>
+                ) : (
+                  <div class="path-body">
+                    {s.bots.slice(0, 8).map(([bot, e]) => (
+                      <div class="bot-row">
+                        <span class="chip" style={`background:${colorFor(bot)}`}>{bot}</span>
+                        <div class="bar" style={`width:${Math.max(2, Math.round(e.hits / s.bots[0][1].hits * 100))}%;background:${colorFor(bot)}`}></div>
+                        <span class="count">{e.hits.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    {s.bots.length > 8 && (
+                      <p style="font-size:.7rem;color:var(--accent);margin:.3rem 0 0">
+                        +{s.bots.length - 8} more crawlers
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  })}
+
+  {topBots.length > 0 && (
+    <>
+      <h2 style="font-size:1rem;margin:2rem 0 .6rem;border-bottom:1px solid var(--border);padding-bottom:.4rem">
+        All crawlers — combined across every endpoint
+      </h2>
+      <div class="top-bots">
+        {topBots.map(([bot, c]) => (
+          <div class="bot-row" style="grid-template-columns:180px 1fr 60px">
+            <span class="chip" style={`background:${colorFor(bot)}`}>{bot}</span>
+            <div class="bar" style={`width:${Math.max(2, Math.round(c / topBots[0][1] * 100))}%;background:${colorFor(bot)}`}></div>
+            <span class="count">{c.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  )}
+
+  {totalHits === 0 && !err && (
+    <p style="font-style:italic;color:var(--accent);margin:2rem 0">
+      No machine-readable endpoint traffic in the snapshot yet.
+      Data populates after the next <a href="/api/snapshot">snapshot run</a>.
+    </p>
+  )}
+
+  <div class="about">
+    <strong>How this works:</strong> Every request to this site passes through a Cloudflare Worker that logs path, User-Agent, IP, and CF metadata to D1. A periodic snapshot job aggregates those rows into KV, which this page reads. Bot classification uses UA strings, CF reverse-DNS verification, and ASN fallbacks.
+    <br /><br />
+    <strong>What each layer means:</strong> The discovery layer is what every crawler checks before indexing — robots.txt signals intent, sitemaps provide the URL map. The AI context layer is purpose-built for LLMs: <a href="/llms.txt">llms.txt</a> gives a plain-text orientation and page list, <a href="/ai-catalog.json">ai-catalog.json</a> enumerates machine-readable endpoints, and <a href="/entitymap.json">entitymap.json</a> declares structured entity relationships (people, concepts, organizations) following the EntityMap v1.0 spec. The raw content layer (.md requests) is agents bypassing HTML parsing entirely.
+  </div>
+</DashboardLayout>

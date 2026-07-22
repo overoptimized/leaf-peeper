@@ -1,0 +1,104 @@
+---
+interface Props {
+  title: string;
+  subtitle?: string;
+}
+const { title, subtitle } = Astro.props;
+const path = Astro.url.pathname.replace(/\/$/, "");
+
+const NAV = [
+  { href: "/dashboard/crawl-stats",   label: "Crawl Stats"   },
+  { href: "/dashboard/crawl-surface", label: "Crawl Surface" },
+  { href: "/dashboard/page-speed",    label: "Page Speed"    },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>{title} — Dashboard</title>
+    <style>
+      :root { color-scheme: light dark; --bd: #e2e8f0; --mut: #64748b; --bg2: #f8fafc; }
+      @media (prefers-color-scheme: dark) { :root { --bd: #2a3340; --mut: #94a3b8; --bg2: #161b22; } }
+      * { box-sizing: border-box; }
+      body { font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+
+      /* ── Header ── */
+      .dash-header { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--bd); }
+      .dash-header h1 { font-size: 1.3rem; margin: 0 0 .15rem; }
+      .dash-header .sub { color: var(--mut); margin: 0 0 .75rem; font-size: .85rem; }
+      .dash-nav { display: flex; flex-wrap: wrap; gap: .3rem; }
+      .dash-nav a {
+        font-size: .78rem; padding: .25rem .65rem; border-radius: 6px;
+        border: 1px solid var(--bd); text-decoration: none; color: var(--mut);
+        transition: border-color .15s, color .15s;
+      }
+      .dash-nav a:hover { color: inherit; border-color: #94a3b8; }
+      .dash-nav a.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+      .dash-nav .home { color: inherit; font-weight: 600; }
+
+      /* ── Common dashboard utility classes ── */
+      h2 { font-size: .95rem; margin: 1.6rem 0 .5rem; }
+      .sub { color: var(--mut); font-size: .85rem; margin: 0 0 1rem; }
+      form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; background: var(--bg2); padding: .75rem; border-radius: 10px; border: 1px solid var(--bd); margin-bottom: 1.2rem; }
+      .fld { display: flex; flex-direction: column; gap: .15rem; }
+      .fld label { font-size: .7rem; color: var(--mut); text-transform: uppercase; letter-spacing: .03em; }
+      .fld input, .fld select { padding: .35rem .5rem; border: 1px solid var(--bd); border-radius: 6px; background: transparent; color: inherit; font: inherit; }
+      button[type="submit"] { padding: .4rem .9rem; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+      a.clear { background: transparent; color: var(--mut); border: 1px solid var(--bd); text-decoration: none; padding: .4rem .9rem; border-radius: 6px; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; margin-bottom: 1.4rem; }
+      .card { border: 1px solid var(--bd); border-radius: 10px; padding: .7rem .85rem; }
+      .card .n { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+      .card .l { font-size: .72rem; color: var(--mut); text-transform: uppercase; letter-spacing: .03em; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+      @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+      table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+      th, td { text-align: left; padding: .3rem .5rem; border-bottom: 1px solid var(--bd); white-space: nowrap; }
+      th { color: var(--mut); font-weight: 600; font-size: .72rem; text-transform: uppercase; }
+      td.wrap { white-space: normal; word-break: break-all; }
+      code { background: #88888822; padding: 0 .25rem; border-radius: 3px; font-size: .92em; }
+      .chip { display: inline-block; padding: .05rem .45rem; border-radius: 99px; font-size: .72rem; color: #fff; }
+      .bar-row { display: grid; grid-template-columns: 150px 1fr 46px; align-items: center; gap: .5rem; margin: .2rem 0; }
+      .bar { height: 16px; border-radius: 3px; }
+      .count { text-align: right; font-variant-numeric: tabular-nums; color: var(--mut); font-size: .78rem; }
+      .legend { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: .4rem 0 .2rem; font-size: .75rem; }
+      .legend span { display: inline-flex; align-items: center; gap: .3rem; }
+      .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+      .err { color: #dc2626; }
+      .empty { color: var(--mut); font-style: italic; padding: 1rem 0; }
+      a { color: #2563eb; }
+      .ua-alert { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: .6rem .9rem; margin-bottom: 1rem; }
+      @media (prefers-color-scheme: dark) { .ua-alert { background: #052e16; border-color: #166534; } }
+      .ua-alert-title { font-size: .72rem; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+      @media (prefers-color-scheme: dark) { .ua-alert-title { color: #86efac; } }
+      .ua-entry { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: .4rem; padding: .2rem 0; border-bottom: 1px solid #dcfce7; font-size: .8rem; }
+      @media (prefers-color-scheme: dark) { .ua-entry { border-color: #14532d; } }
+      .ua-entry:last-child { border-bottom: none; }
+      .ua-str { font-family: ui-monospace, monospace; font-size: .71rem; color: var(--mut); word-break: break-all; white-space: normal; }
+      details summary { cursor: pointer; list-style: none; font-size: .75rem; color: var(--mut); }
+      details summary::-webkit-details-marker { display: none; }
+      .ua-list { margin: .25rem 0 .25rem .5rem; padding: 0; list-style: none; }
+      .ua-list li { display: grid; grid-template-columns: 1fr auto; gap: .5rem; padding: .15rem 0; font-size: .71rem; color: var(--mut); border-bottom: 1px solid var(--bd); font-family: ui-monospace, monospace; word-break: break-all; white-space: normal; }
+      .ua-list li:last-child { border-bottom: none; }
+      .never-grid { display: flex; flex-wrap: wrap; gap: .3rem .6rem; }
+      .never-chip { font-size: .72rem; padding: .1rem .45rem; border-radius: 99px; border: 1px solid var(--bd); }
+    </style>
+  </head>
+  <body>
+    <header class="dash-header">
+      <h1>{title}</h1>
+      {subtitle && <p class="sub">{subtitle}</p>}
+      <nav class="dash-nav">
+        <a href="/dashboard/" class:list={["home", { active: path === "/dashboard" || path === "/dashboard/" }]}>Dashboard</a>
+        {NAV.map(n => (
+          <a href={n.href} class:list={{ active: path === n.href }}>{n.label}</a>
+        ))}
+      </nav>
+    </header>
+
+    <slot />
+  </body>
+</html>

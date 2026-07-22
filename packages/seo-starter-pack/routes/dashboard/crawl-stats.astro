@@ -1,0 +1,615 @@
+---
+export const prerender = false;
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { env } from "cloudflare:workers";
+import { colorFor } from "../../lib/botClassify.js";
+import { groupFor, GROUP_COLORS, GROUP_LABELS, GROUP_ORDER as groupOrder } from "../../lib/botGroups.js";
+
+Astro.response.headers.set("cache-control", "public, max-age=600, s-maxage=3600");
+
+let metaRaw = null, totalsRaw = null, dailyRaw = null, perpathRaw = null, err = null;
+try {
+  [metaRaw, totalsRaw, dailyRaw, perpathRaw] = await Promise.all([
+    env.STATS.get("snapshot:meta"),
+    env.STATS.get("snapshot:totals"),
+    env.STATS.get("snapshot:daily"),
+    env.STATS.get("snapshot:perpath"),
+  ]);
+} catch (e) { err = e.message; }
+
+const meta    = metaRaw    ? JSON.parse(metaRaw)    : null;
+const totals  = totalsRaw  ? JSON.parse(totalsRaw)  : null;
+const daily   = dailyRaw   ? JSON.parse(dailyRaw)   : null;
+const perpath = perpathRaw ? JSON.parse(perpathRaw) : null;
+
+const fmtDate = (ts) => new Date(ts).toISOString().slice(0, 10);
+const fmtAgo  = (ts) => {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
+
+// ── Build bots array from snapshot:totals ────────────────────────────────────
+const bots = totals
+  ? Object.entries(totals)
+      .map(([bot, d]) => ({
+        bot,
+        hits:      d.hits,
+        firstSeen: d.firstSeen,
+        lastSeen:  d.lastSeen,
+        countries: d.countries || {},
+        group:     groupFor(bot),
+      }))
+      .sort((a, b) => b.hits - a.hits)
+  : [];
+
+const totalHits = bots.reduce((s, b) => s + b.hits, 0);
+
+// Country totals aggregated across all bots
+const countryTotals = {};
+for (const b of bots) {
+  for (const [cc, n] of Object.entries(b.countries)) {
+    countryTotals[cc] = (countryTotals[cc] || 0) + n;
+  }
+}
+const topCountries = Object.entries(countryTotals)
+  .sort((a, b) => b[1] - a[1]).slice(0, 15)
+  .map(([country, hits]) => ({ country, hits }));
+
+// Path totals from snapshot:perpath { path: [{bot, hits}] }
+const pathTotals = {};
+if (perpath) {
+  for (const [path, entries] of Object.entries(perpath)) {
+    pathTotals[path] = entries.reduce((s, e) => s + e.hits, 0);
+  }
+}
+const topPaths = Object.entries(pathTotals)
+  .sort((a, b) => b[1] - a[1]).slice(0, 20)
+  .map(([path, hits]) => ({ path, hits }));
+
+// ── Time series from snapshot:daily ──────────────────────────────────────────
+const WINDOW = 30;
+const today  = new Date();
+const seriesDates = Array.from({ length: WINDOW }, (_, i) => {
+  const d = new Date(today); d.setDate(d.getDate() - (WINDOW - 1 - i));
+  return d.toISOString().slice(0, 10);
+});
+const series = seriesDates.map(date => ({ date, counts: daily?.[date] || {} }));
+
+const topSeriesBots = bots.slice(0, 8).map(b => b.bot);
+const maxDay = Math.max(1, ...series.map(s => Object.values(s.counts).reduce((a, c) => a + c, 0)));
+const maxHits = bots.length ? bots[0].hits : 1;
+
+const recentSeries = series.slice(-7);
+const velocityData = recentSeries.map(s => Object.values(s.counts).reduce((a, b) => a + b, 0));
+const maxVel = Math.max(1, ...velocityData);
+
+const xmlPaths = topPaths.filter(p => p.path.toLowerCase().endsWith('.xml'));
+const txtPaths = topPaths.filter(p => p.path.toLowerCase().endsWith('robots.txt'));
+const xmlHits  = xmlPaths.reduce((s, p) => s + p.hits, 0);
+const txtHits  = txtPaths.reduce((s, p) => s + p.hits, 0);
+const asnBots  = bots.filter(b => b.bot.includes('by ASN'));
+
+// ── Donut helpers — pass index to colorFn for gradient palettes ───────────────
+const getSlices = (data, colorFn) => {
+  const total = data.reduce((a, v) => a + v.hits, 0) || 1;
+  let offset = 25;
+  return data.filter(d => d.hits > 0).slice(0, 8).map((item, idx) => {
+    const pct = (item.hits / total) * 100;
+    const cur = offset; offset -= pct;
+    return {
+      label:      item.label || item.bot || item.country || item.path,
+      hits:       item.hits,
+      pct,
+      dasharray:  `${pct} ${100 - pct}`,
+      dashoffset: cur,
+      color:      colorFn(item, idx),
+    };
+  }).filter(s => s.pct > 0);
+};
+
+const groups = {};
+for (const b of bots) (groups[b.group] = groups[b.group] || []).push(b);
+
+const primaryGroups   = ["search", "ai"];
+const secondaryGroups = ["seo", "social", "scanner", "other", "human", "tool", "headless", "asn", "unknown"];
+
+const botTypesData   = groupOrder.map(g => ({ label: GROUP_LABELS[g], hits: groups[g]?.reduce((a, b) => a + b.hits, 0) || 0, id: g }));
+const botTypesSlices = getSlices(botTypesData,        (item)    => (GROUP_COLORS[item.id] || {bar: "#94a3b8"}).bar);
+const searchSlices   = getSlices(groups.search || [], (item)    => colorFor(item.bot));
+const aiSlices       = getSlices(groups.ai     || [], (item)    => colorFor(item.bot));
+const countrySlices  = getSlices(topCountries,        (_, i)    => `hsl(210,50%,${40 + i * 7}%)`);
+const pageSlices     = getSlices(topPaths,             (_, i)    => `hsl(280,50%,${45 + i * 6}%)`);
+
+const contentTypes = { "HTML / Pages": 0, "XML Data": 0, "JSON / API": 0, "Robots / TXT": 0, "Other": 0 };
+topPaths.forEach(p => {
+  const path = p.path.toLowerCase();
+  if (path.endsWith('.xml')) contentTypes["XML Data"] += p.hits;
+  else if (path.endsWith('.json') || path.includes('/api/')) contentTypes["JSON / API"] += p.hits;
+  else if (path.endsWith('robots.txt') || path.endsWith('.txt')) contentTypes["Robots / TXT"] += p.hits;
+  else if (path.match(/\.[a-z0-9]+$/i)) contentTypes["Other"] += p.hits;
+  else contentTypes["HTML / Pages"] += p.hits;
+});
+const contentSlices = getSlices(
+  Object.entries(contentTypes).map(([label, hits]) => ({ label, hits })),
+  (_, i) => `hsl(160,60%,${35 + i * 10}%)`
+);
+
+// Each donut gets an id for JS targeting
+const donutCharts = [
+  { id: "segment",  title: "Traffic by Bot Segment", slices: botTypesSlices },
+  { id: "search",   title: "Search Engine Share",    slices: searchSlices   },
+  { id: "ai",       title: "AI Crawler Share",       slices: aiSlices       },
+  { id: "content",  title: "Content Types Targeted", slices: contentSlices  },
+  { id: "paths",    title: "Most Crawled Paths",     slices: pageSlices     },
+  { id: "country",  title: "Top Origin Countries",   slices: countrySlices  },
+];
+
+const W = 640, H = 140, PAD = 20;
+const barW = series.length ? (W - PAD * 2) / series.length : 0;
+const hasData = bots.length > 0;
+
+// Segment filter chips data — includes hit counts for display
+const filterChips = groupOrder
+  .filter(g => groups[g]?.length > 0)
+  .map(g => {
+    const cg = GROUP_COLORS[g] || GROUP_COLORS.unknown;
+    return {
+      g,
+      label: GROUP_LABELS[g] || g,
+      hits: groups[g].reduce((a, b) => a + b.hits, 0),
+      color: cg.bar,
+    };
+  });
+---
+
+<DashboardLayout title="Crawl Stats">
+  <div class="cl">
+    <div class="page-header">
+      <div>
+        <h1>What crawls this site?</h1>
+        <p class="intro">A live look at every bot, crawler, and scanner that has visited this site — search engines, AI crawlers, SEO tools, and everything else that shows up.</p>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
+        <a href="/dashboard/crawl-surface/" class="speed-link">
+          <span class="speed-label">Crawl Surface</span>
+          <span class="speed-sub">Bot endpoints →</span>
+        </a>
+        <a href="/dashboard/page-speed/" class="speed-link">
+          <span class="speed-label">Core Web Vitals</span>
+          <span class="speed-sub">Page Speed →</span>
+        </a>
+      </div>
+    </div>
+
+    {hasData && (
+      <div class="stats">
+        <div class="stat"><span class="n">{totalHits.toLocaleString()}</span><span class="l">Total requests</span></div>
+        <div class="stat"><span class="n">{bots.length}</span><span class="l">Distinct bots</span></div>
+        <div class="stat"><span class="n">{topPaths.length}</span><span class="l">Paths hit</span></div>
+        <div class="stat"><span class="n">{topCountries.length}</span><span class="l">Countries</span></div>
+      </div>
+    )}
+
+    {err && <p class="empty">Stats temporarily unavailable.</p>}
+    {!err && !hasData && <p class="empty">No crawl data yet — check back soon.</p>}
+
+    {hasData && (
+      <>
+        {/* ── Segment filter bar ── */}
+        <div class="filter-bar" id="filter-bar">
+          <button class="fchip active" data-group="all">All segments</button>
+          {filterChips.map(c => (
+            <button class="fchip" data-group={c.g} style={`--chip-color:${c.color}`}>
+              <i style={`background:${c.color}`}></i>
+              {c.label}
+              <span class="chip-ct">{c.hits.toLocaleString()}</span>
+            </button>
+          ))}
+        </div>
+
+        <h2>Activity (last 30 days)</h2>
+        <div class="legend" id="interactive-legend">
+          {topSeriesBots.map(b => (
+            <span class="leg" data-bot={b} data-group={groupFor(b)} title="Click to highlight">
+              <i class="sw" style={`background:${colorFor(b)}`}></i>{b}
+            </span>
+          ))}
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} class="chart" id="trend-chart">
+          {series.map((s, i) => {
+            let y = H - PAD; const x = PAD + i * barW;
+            return topSeriesBots.map(b => {
+              const c = s.counts[b] || 0; if (!c) return null;
+              const h = (c / maxDay) * (H - PAD * 2); y -= h;
+              return <rect data-bot={b} data-group={groupFor(b)} x={x + 1} y={y} width={Math.max(1, barW - 2)} height={h} fill={colorFor(b)} rx="1" />;
+            });
+          })}
+          <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--border)" />
+        </svg>
+
+        <h2 class="section-title">Distribution Breakdown</h2>
+        <div class="donut-grid">
+          {donutCharts.map(chart => chart.slices.length > 0 && (
+            <div class="donut-card" data-donut-id={chart.id}>
+              <h3>{chart.title}</h3>
+              <div class="donut-wrap">
+                <div class="svg-container">
+                  <svg width="100%" height="100%" viewBox="0 0 42 42" class="donut">
+                    <circle cx="21" cy="21" r="15.9154943" fill="transparent" stroke="var(--border)" stroke-width="6" opacity="0.3"></circle>
+                    {chart.slices.map((s, si) => (
+                      <circle cx="21" cy="21" r="15.9154943" fill="transparent"
+                        stroke={s.color} stroke-width="6"
+                        stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset}
+                        class="donut-segment" data-idx={si} data-donut={chart.id}>
+                      </circle>
+                    ))}
+                  </svg>
+                </div>
+                <div class="donut-legend" data-donut={chart.id}>
+                  {chart.slices.map((s, si) => (
+                    <div class="d-leg-item" data-idx={si} data-donut={chart.id} title={`${s.hits.toLocaleString()} hits`}>
+                      <i style={`background:${s.color}`}></i>
+                      <span class="d-leg-pct">{s.pct < 1 ? "<1" : Math.round(s.pct)}%</span>
+                      <span class="d-leg-lbl">{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <h2 class="section-title mt-top">Infrastructure & Velocity</h2>
+        <div class="infra-grid">
+          <div class="infra-card">
+            <h3>7-Day Rolling Velocity</h3>
+            <p class="infra-sub">Total crawl volume over the last week.</p>
+            <div class="vel-chart">
+              {velocityData.map((val, i) => (
+                <div class="vel-bar-wrap" title={`${recentSeries[i].date}: ${val.toLocaleString()} hits`}>
+                  <div class="vel-bar" style={`height:${Math.max(5, (val / maxVel) * 100)}%`}></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="infra-card">
+            <h3>Crawler Controls</h3>
+            <p class="infra-sub">Hits checking permissions & site structures.</p>
+            <div class="control-stats">
+              <div class="c-stat"><span class="c-lbl">robots.txt</span><span class="c-val">{txtHits.toLocaleString()}</span></div>
+              <div class="c-stat"><span class="c-lbl">*.xml (Sitemaps)</span><span class="c-val">{xmlHits.toLocaleString()}</span></div>
+            </div>
+            {xmlPaths.length > 0 && (
+              <div class="micro-list">
+                {xmlPaths.slice(0, 3).map(p => (
+                  <div class="m-item"><code>{p.path}</code><span>{p.hits}</span></div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div class="infra-card">
+            <h3>ASN Identifications</h3>
+            <p class="infra-sub">Known company IP ranges matched by network block — not user-agent. These crawlers deliberately omit or rotate their UA string.</p>
+            <div class="micro-list">
+              {asnBots.length > 0 ? asnBots.slice(0, 5).map(b => (
+                <div class="m-item">
+                  <span>{b.bot.replace(" (by ASN)", "")}</span>
+                  <span>{b.hits.toLocaleString()} hits</span>
+                </div>
+              )) : <span class="empty-inline">No ASN-specific bots detected.</span>}
+            </div>
+          </div>
+        </div>
+
+        <h2 class="section-title mt-top">Bot Directory</h2>
+        <div class="tier-primary" id="bot-directory">
+          {primaryGroups.map(g => groups[g] && groups[g].length > 0 && (
+            <div class="group" data-section-group={g}>
+              <h2 class="group-title">
+                <span class="gdot" style={`background:${GROUP_COLORS[g]?.bar || '#94a3b8'}`}></span>
+                {GROUP_LABELS[g] || g}
+                <span class="gcount">{groups[g].reduce((a, b) => a + b.hits, 0).toLocaleString()} hits</span>
+              </h2>
+              <div class="bot-grid">
+                {groups[g].map(b => (
+                  <div class="bot bot-highlight" data-bot={b.bot} data-group={g} style={`border-color:${GROUP_COLORS[g]?.bar || '#94a3b8'}40;background:${GROUP_COLORS[g]?.bg || '#94a3b80a'}`}>
+                    <div class="bot-top">
+                      <span class="bot-name" style={`color:${GROUP_COLORS[g]?.text || '#94a3b8'}`}>{b.bot}</span>
+                      <span class="bot-hits">{b.hits.toLocaleString()}</span>
+                    </div>
+                    <div class="bot-meta">first {fmtDate(b.firstSeen)} · last {fmtDate(b.lastSeen)}</div>
+                    <div class="bot-bar-wrap">
+                      <div class="bot-bar" style={`width:${Math.max(3, (b.hits / maxHits) * 100)}%;background:${colorFor(b.bot)}`}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="tier-secondary">
+          <div class="secondary-header">
+            <h2>Other Bot Segments</h2>
+            <p class="sub-text">SEO tools, social fetchers, scanners, and unclassified traffic. "Other / Unclassified" includes UAs that don't match any of the 1,200+ known bot signatures — typically generic scrapers, headless browsers, or truly blank user-agents.</p>
+          </div>
+          <div class="secondary-grid-layout">
+            {secondaryGroups.map(g => groups[g] && groups[g].length > 0 && (
+              <div class="group-compact" data-section-group={g}>
+                <h3 class="compact-title">
+                  <span class="gdot" style={`background:${GROUP_COLORS[g]?.bar || '#94a3b8'}`}></span>
+                  {GROUP_LABELS[g] || g}
+                  <span class="gcount">{groups[g].reduce((a, b) => a + b.hits, 0).toLocaleString()}</span>
+                </h3>
+                <div class="bot-grid bot-grid-dense">
+                  {groups[g].map(b => (
+                    <div class="bot bot-compact" data-bot={b.bot} data-group={g} style={`border-color:${GROUP_COLORS[g]?.bar || '#94a3b8'}20`}>
+                      <div class="bot-top">
+                        <span class="bot-name">{b.bot}</span>
+                        <span class="bot-hits">{b.hits.toLocaleString()}</span>
+                      </div>
+                      <div class="bot-bar-wrap">
+                        <div class="bot-bar" style={`width:${Math.max(2, (b.hits / maxHits) * 100)}%;background:${GROUP_COLORS[g]?.bar || '#94a3b8'}`}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div class="two-col mt-top">
+          <div>
+            <h2>Top paths</h2>
+            <table>
+              <thead><tr><th>Path</th><th class="r">Hits</th></tr></thead>
+              <tbody>
+                {topPaths.slice(0, 15).map(p => (
+                  <tr><td><code>{p.path}</code></td><td class="r">{p.hits.toLocaleString()}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h2>Countries</h2>
+            <table>
+              <thead><tr><th>Code</th><th class="r">Hits</th></tr></thead>
+              <tbody>
+                {topCountries.map(c => (
+                  <tr><td>{c.country}</td><td class="r">{c.hits.toLocaleString()}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {meta && (
+          <p class="foot">Updated {fmtAgo(meta.lastRun)}. Aggregate data only — no visitor information shown.</p>
+        )}
+      </>
+    )}
+  </div>
+</DashboardLayout>
+
+<style>
+  .cl { max-width: 100%; }
+
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: .25rem; flex-wrap: wrap; }
+  .page-header > div { flex: 1; min-width: 0; }
+  .speed-link { display: flex; flex-direction: column; align-items: flex-end; gap: .15rem; border: 1px solid var(--border); border-radius: 8px; padding: .6rem .9rem; text-decoration: none; transition: border-color .2s, background .2s; white-space: nowrap; flex-shrink: 0; }
+  .speed-link:hover { border-color: #4285f4; background: #4285f410; }
+  .speed-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  .speed-sub { font-size: .9rem; font-weight: 600; color: #4285f4; }
+
+  .intro { color: var(--accent); margin-bottom: 2rem; line-height: 1.5; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+  .stat { border: 1px solid var(--border); border-radius: 8px; padding: .8rem 1rem; }
+  .stat .n { display: block; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: .75rem; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem; display: block; }
+
+  /* ── Filter bar ── */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.5rem; }
+  .fchip { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .75rem; border-radius: 99px; border: 1px solid var(--border); background: transparent; font-size: .78rem; font-weight: 500; cursor: pointer; transition: all .15s; color: inherit; }
+  .fchip i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .fchip:hover { border-color: var(--chip-color, currentColor); background: color-mix(in srgb, var(--chip-color, currentColor) 8%, transparent); }
+  .fchip.active { border-color: var(--chip-color, currentColor); background: color-mix(in srgb, var(--chip-color, currentColor) 12%, transparent); }
+  .fchip[data-group="all"].active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .chip-ct { font-weight: 400; opacity: .65; font-size: .72rem; font-variant-numeric: tabular-nums; }
+
+  h2 { font-size: 1.1rem; margin: 2rem 0 .75rem; display: flex; align-items: center; gap: .5rem; }
+  .section-title { font-size: 1.3rem; margin-bottom: 1.5rem; }
+  .mt-top { margin-top: 3rem; }
+
+  .chart { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; font-size: .75rem; color: var(--accent); margin-bottom: .5rem; }
+  .leg { display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; transition: opacity .2s; user-select: none; }
+  .leg:hover { opacity: .8; }
+  .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .leg.inactive { opacity: .3; }
+  rect[data-bot] { transition: opacity .3s ease; }
+  .bot[data-bot] { transition: opacity .3s ease; }
+  .group[data-section-group] { transition: opacity .3s ease; }
+  .group-compact[data-section-group] { transition: opacity .3s ease; }
+  .dimmed { opacity: .1 !important; pointer-events: none; }
+  .grp-hidden { opacity: .15; pointer-events: none; }
+
+  /* ── Donuts ── */
+  .donut-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
+  .donut-card { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .donut-card h3 { font-size: .9rem; margin: 0 0 1rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .03em; }
+  .donut-wrap { display: flex; gap: 1.5rem; align-items: center; }
+  .svg-container { width: 80px; height: 80px; flex: none; }
+  .donut { transform: rotate(-90deg); }
+  .donut-segment { transition: stroke-width .2s, opacity .2s; cursor: pointer; }
+  .donut-segment:hover, .donut-segment.seg-active { stroke-width: 7.5; }
+  .donut-segment.seg-dim { opacity: .2; }
+  .donut-legend { display: flex; flex-direction: column; gap: .4rem; flex-grow: 1; min-width: 0; }
+  .d-leg-item { display: flex; align-items: center; gap: .4rem; font-size: .8rem; cursor: pointer; border-radius: 4px; padding: .1rem .2rem; transition: background .15s; }
+  .d-leg-item:hover { background: color-mix(in srgb, currentColor 5%, transparent); }
+  .d-leg-item.seg-active { font-weight: 600; }
+  .d-leg-item.seg-dim { opacity: .35; }
+  .d-leg-item i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  /* Fixed width wide enough for "100%" without overflow */
+  .d-leg-pct { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+  .d-leg-lbl { color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Infrastructure ── */
+  .infra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
+  .infra-card { border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; }
+  .infra-card h3 { font-size: .95rem; margin: 0 0 .25rem; font-weight: 600; }
+  .infra-sub { font-size: .75rem; color: var(--accent); margin: 0 0 1rem; line-height: 1.5; }
+
+  .vel-chart { display: flex; align-items: flex-end; justify-content: space-between; height: 70px; gap: 4px; margin-top: auto; padding-top: 1rem; }
+  .vel-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; border-radius: 3px; cursor: crosshair; }
+  .vel-bar { width: 100%; background: var(--text-main, #000); border-radius: 3px; transition: height .3s; opacity: .8; }
+  .vel-bar-wrap:hover .vel-bar { opacity: 1; background: #4285f4; }
+
+  .control-stats { display: flex; gap: 1rem; margin-bottom: 1rem; margin-top: auto; }
+  .c-stat { flex: 1; background: var(--border); padding: .75rem; border-radius: 6px; }
+  .c-lbl { display: block; font-size: .75rem; color: var(--accent); margin-bottom: .2rem; }
+  .c-val { font-size: 1.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .micro-list { display: flex; flex-direction: column; gap: .4rem; font-size: .8rem; margin-top: auto; }
+  .m-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border); padding-bottom: .3rem; }
+  .m-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .empty-inline { font-size: .8rem; color: var(--accent); font-style: italic; }
+
+  /* ── Bot directory ── */
+  .group-title { font-size: 1rem; font-weight: 600; padding-bottom: .25rem; border-bottom: 1px solid var(--border); }
+  .gdot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .gcount { font-weight: 400; color: var(--accent); font-size: .85rem; margin-left: auto; }
+
+  .group { margin-bottom: 1.5rem; }
+  .bot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .75rem; }
+  .bot { border: 1px solid var(--border); border-radius: 8px; padding: .75rem; }
+  .bot-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .25rem; }
+  .bot-name { font-weight: 600; font-size: .9rem; }
+  .bot-hits { font-variant-numeric: tabular-nums; font-size: .85rem; font-weight: 500; }
+  .bot-meta { font-size: .75rem; color: var(--accent); margin: .2rem 0 .5rem; }
+  .bot-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .bot-bar { height: 100%; border-radius: 2px; }
+
+  .tier-primary { margin-bottom: 3rem; }
+  .bot-highlight { box-shadow: 0 2px 8px rgba(0,0,0,.02); }
+
+  .tier-secondary { padding: 1.5rem; background: color-mix(in srgb, var(--border) 30%, transparent); border-radius: 12px; margin-bottom: 2rem; }
+  .secondary-header h2 { margin-top: 0; margin-bottom: .2rem; border: none; }
+  .sub-text { font-size: .8rem; color: var(--accent); margin-bottom: 1.5rem; margin-top: 0; line-height: 1.6; }
+  .secondary-grid-layout { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .group-compact { border-left: 2px solid var(--border); padding-left: 1rem; }
+  .compact-title { font-size: .85rem; margin: 0 0 .75rem; display: flex; align-items: center; gap: .4rem; text-transform: uppercase; letter-spacing: .03em; color: var(--accent); }
+  .bot-grid-dense { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .5rem; }
+  .bot-compact { padding: .5rem; background: transparent; }
+  .bot-compact .bot-name { font-size: .8rem; font-weight: 500; }
+  .bot-compact .bot-hits { font-size: .75rem; color: var(--accent); }
+  .bot-compact .bot-bar-wrap { margin-top: .4rem; height: 3px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--accent); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .02em; }
+  .r { text-align: right; }
+  code { background: var(--border); padding: .1rem .3rem; border-radius: 4px; font-size: .9em; word-break: break-all; }
+
+  .empty { color: var(--accent); font-style: italic; padding: 2rem 0; text-align: center; }
+  .foot { color: var(--accent); font-size: .8rem; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; line-height: 1.5; }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+
+    // ── 1. Bar chart bot-level interactive legend ──────────────────────────────
+    const botLegs   = document.querySelectorAll(".leg[data-bot]");
+    const botRects  = document.querySelectorAll("rect[data-bot]");
+    const botCards  = document.querySelectorAll(".bot[data-bot]");
+    const selBots   = new Set();
+
+    botLegs.forEach(leg => {
+      leg.addEventListener("click", () => {
+        const bot = leg.dataset.bot;
+        if (selBots.has(bot)) selBots.delete(bot); else selBots.add(bot);
+        const active = selBots.size > 0;
+        botLegs.forEach(l  => l.classList.toggle("inactive", active && !selBots.has(l.dataset.bot)));
+        botRects.forEach(r => r.classList.toggle("dimmed",   active && !selBots.has(r.dataset.bot)));
+        botCards.forEach(c => c.classList.toggle("dimmed",   active && !selBots.has(c.dataset.bot)));
+      });
+    });
+
+    // ── 2. Donut segment hover / click highlighting ────────────────────────────
+    document.querySelectorAll(".donut-card").forEach(card => {
+      const donutId = card.dataset.donutId;
+      const segs    = card.querySelectorAll(".donut-segment");
+      const items   = card.querySelectorAll(".d-leg-item");
+      let activeIdx = null;
+
+      const applyHighlight = (idx) => {
+        segs.forEach((s, i) => {
+          s.classList.toggle("seg-active", i === idx);
+          s.classList.toggle("seg-dim",    idx !== null && i !== idx);
+        });
+        items.forEach((it, i) => {
+          it.classList.toggle("seg-active", i === idx);
+          it.classList.toggle("seg-dim",    idx !== null && i !== idx);
+        });
+      };
+
+      const toggle = (idx) => {
+        activeIdx = activeIdx === idx ? null : idx;
+        applyHighlight(activeIdx);
+      };
+
+      segs.forEach((seg, i) => {
+        seg.addEventListener("click",      () => toggle(i));
+        seg.addEventListener("mouseenter", () => { if (activeIdx === null) applyHighlight(i); });
+        seg.addEventListener("mouseleave", () => { if (activeIdx === null) applyHighlight(null); });
+      });
+
+      items.forEach((item, i) => {
+        item.addEventListener("click",      () => toggle(i));
+        item.addEventListener("mouseenter", () => { if (activeIdx === null) applyHighlight(i); });
+        item.addEventListener("mouseleave", () => { if (activeIdx === null) applyHighlight(null); });
+      });
+    });
+
+    // ── 3. Segment filter bar ──────────────────────────────────────────────────
+    const chips      = document.querySelectorAll(".fchip");
+    const allSections = document.querySelectorAll("[data-section-group]");
+    const allBotRects = document.querySelectorAll("rect[data-group]");
+    const allBotCards = document.querySelectorAll(".bot[data-group]");
+    let activeGroup   = "all";
+
+    const applyGroupFilter = (g) => {
+      activeGroup = g;
+      chips.forEach(c => c.classList.toggle("active", c.dataset.group === g));
+      if (g === "all") {
+        allSections.forEach(s => s.classList.remove("grp-hidden"));
+        allBotRects.forEach(r => r.classList.remove("dimmed"));
+        allBotCards.forEach(c => c.classList.remove("dimmed"));
+        selBots.clear();
+        botLegs.forEach(l  => l.classList.remove("inactive"));
+        botRects.forEach(r => r.classList.remove("dimmed"));
+        botCards.forEach(c => c.classList.remove("dimmed"));
+      } else {
+        allSections.forEach(s => s.classList.toggle("grp-hidden", s.dataset.sectionGroup !== g));
+        allBotRects.forEach(r => r.classList.toggle("dimmed", r.dataset.group !== g));
+        allBotCards.forEach(c => c.classList.toggle("dimmed", c.dataset.group !== g));
+      }
+    };
+
+    chips.forEach(chip => {
+      chip.addEventListener("click", () => applyGroupFilter(chip.dataset.group));
+    });
+
+    // Activate group filter from ?group= URL param (deep-link from CrawlWidget)
+    const urlGroup = new URLSearchParams(location.search).get("group");
+    if (urlGroup) applyGroupFilter(urlGroup);
+
+  });
+</script>
