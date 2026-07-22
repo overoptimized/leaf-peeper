@@ -5,12 +5,12 @@ import react from '@astrojs/react';
 
 import keystatic from '@keystatic/astro';
 
-import node from '@astrojs/node';
+import cloudflare from '@astrojs/cloudflare';
 
 // https://astro.build/config
 export default defineConfig({
   integrations: [react(), keystatic()],
-  adapter: node({
-    mode: 'standalone'
+  adapter: cloudflare({
+    imageService: 'cloudflare',
   })
 });
