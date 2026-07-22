@@ -6,14 +6,9 @@ import locations from '../../data/locations.json';
 import drives from '../../data/drives.json';
 import geojsonData from '../../../public/us-states.json';
 
-export function getStaticPaths() {
-  return regions.map(region => ({
-    params: { region: region.slug },
-    props: { region },
-  }));
-}
-
-const { region } = Astro.props;
+const { region: regionSlug } = Astro.params;
+const region = (regions as any[]).find((r: any) => r.slug === regionSlug);
+if (!region) return Astro.redirect('/404');
 
 // Get all locations for this region
 const regionLocations = locations.filter(loc => region.states.includes(loc.stateSlug));
