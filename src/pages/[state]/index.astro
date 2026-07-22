@@ -5,8 +5,7 @@ import locations from '../../data/locations.json';
 import statesData from '../../data/states.json';
 import FoliageMap from '../../components/FoliageMap';
 import StateDropdown from '../../components/StateDropdown';
-import fs from 'node:fs';
-import path from 'node:path';
+import geojsonData from '../../../public/us-states.json';
 
 export function getStaticPaths() {
   return statesData.map(state => ({
@@ -41,7 +40,6 @@ const hubs = Array.from(hubsMap.values());
 // Load state boundary GeoJSON
 let boundaryGeoJSON = null;
 try {
-  const geojsonData = JSON.parse(fs.readFileSync(path.resolve('public/us-states.json'), 'utf8'));
   const stateFeature = geojsonData.features.find(f => f.properties.NAME === stateName);
   if (stateFeature) {
     boundaryGeoJSON = { type: 'FeatureCollection', features: [stateFeature] };

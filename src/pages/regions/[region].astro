@@ -4,8 +4,7 @@ import FoliageMap from '../../components/FoliageMap.jsx';
 import regions from '../../data/regions.json';
 import locations from '../../data/locations.json';
 import drives from '../../data/drives.json';
-import fs from 'node:fs';
-import path from 'node:path';
+import geojsonData from '../../../public/us-states.json';
 
 export function getStaticPaths() {
   return regions.map(region => ({
@@ -25,7 +24,6 @@ const regionDrives = drives.filter(drive => drive.states && drive.states.some(s 
 // Load region boundary GeoJSON
 let boundaryGeoJSON = null;
 try {
-  const geojsonData = JSON.parse(fs.readFileSync(path.resolve('public/us-states.json'), 'utf8'));
   
   // Create a mapping from slug (e.g. "mi") to Name (e.g. "Michigan")
   const stateNames = {

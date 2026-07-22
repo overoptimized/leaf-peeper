@@ -1,12 +1,11 @@
 ---
-import fs from 'fs';
-import path from 'path';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { point } from '@turf/helpers';
 import Layout from '../layouts/Layout.astro';
 import FoliageMap from '../components/FoliageMap';
 import StateDropdown from '../components/StateDropdown';
 import HubSidebar from '../components/HubSidebar';
+import usCounties from '../data/us-counties.json';
 
 const { state, slug } = Astro.params;
 const city = slug;
@@ -61,10 +60,8 @@ const combinedRoutesGeoJSON = routeFeatures.length > 0 ? {
 } : null;
 
 // Determine County Boundary for this Hub
-const countiesPath = path.join(process.cwd(), 'src/data/us-counties.json');
 let boundaryGeoJSON = null;
-if (fs.existsSync(countiesPath)) {
-  const usCounties = JSON.parse(fs.readFileSync(countiesPath, 'utf8'));
+try {
   const pt = point([centerLng, centerLat]);
   for (const feature of usCounties.features) {
     if (feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')) {
@@ -74,7 +71,7 @@ if (fs.existsSync(countiesPath)) {
       }
     }
   }
-}
+} catch (e) {}
 
 ---
 

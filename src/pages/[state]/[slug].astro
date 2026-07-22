@@ -1,15 +1,9 @@
 ---
 import locations from '../../data/locations.json';
 import drives from '../../data/drives.json';
-import fs from 'fs';
-import path from 'path';
+import phenologyData from '../../data/historical-phenology.json';
 import CityHubView from '../../views/CityHubView.astro';
 import LocationView from '../../views/LocationView.astro';
-
-let phenologyData = {};
-try {
-  phenologyData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/data/historical-phenology.json'), 'utf8'));
-} catch(e) {}
 
 export function getStaticPaths() {
   const paths = [];

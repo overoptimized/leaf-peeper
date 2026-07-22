@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import InteractiveMap from '../components/InteractiveMap';
+import FoliageMap from '../components/FoliageMap';
+import usStates from '../data/us-states.json';
 ---
 
 <Layout 
@@ -24,8 +25,8 @@ import InteractiveMap from '../components/InteractiveMap';
     {/* EXPLORE BY STATE */}
     <div style="max-width: 1200px; margin: 0 auto; padding: 96px 24px;">
       <div class="content-section reverse">
-        <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
-          <InteractiveMap client:load />
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; height: 500px; position: relative;">
+          <FoliageMap client:load center={[39.8283, -98.5795]} initialZoom={3} statesGeoJSON={usStates} />
         </div>
         <div class="content-text">
           <h2 style="font-size: 3rem; color: #111; margin-bottom: 24px;">Explore by State</h2>
