@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LocalWeather from './LocalWeather';
 import Breadcrumbs from './Breadcrumbs';
 
