@@ -1,0 +1,183 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TopNav from '../../components/TopNav.jsx';
+import FoliageMap from '../../components/FoliageMap.jsx';
+import drives from '../../data/drives.json';
+import locations from '../../data/locations.json';
+import statesData from '../../data/states.json';
+
+export function getStaticPaths() {
+  return drives.map(drive => ({
+    params: { slug: drive.slug },
+    props: { drive },
+  }));
+}
+
+const { drive } = Astro.props;
+
+// Find locations related to this drive
+const driveLocations = locations.filter(loc => drive.locations.includes(loc.slug));
+
+function getDistanceFromLatLonInMiles(lat1, lon1, lat2, lon2) {
+  const R = 3958.8;
+  const dLat = (lat2-lat1) * (Math.PI/180);
+  const dLon = (lon2-lon1) * (Math.PI/180);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c;
+}
+
+let nearbyLocations = [];
+if (drive.center) {
+  nearbyLocations = locations.filter(loc => {
+    if (driveLocations.some(dl => dl.slug === loc.slug)) return false;
+    const dist = getDistanceFromLatLonInMiles(drive.center[0], drive.center[1], loc.coordinates.lat, loc.coordinates.lng);
+    return dist <= 60; // within 60 miles of the drive's center
+  });
+}
+
+// Calculate fallback center based on the first state
+let fallbackCenter = [39.8283, -98.5795]; // US Center
+let fallbackZoom = 9;
+
+if (!drive.center && drive.states && drive.states.length > 0) {
+  const stateInfo = statesData.find(s => s.stateSlug === drive.states[0]);
+  if (stateInfo && stateInfo.coordinates) {
+    fallbackCenter = [stateInfo.coordinates.lat, stateInfo.coordinates.lng];
+    fallbackZoom = 6; // Zoom out to state level
+  }
+}
+
+const mapCenter = drive.center || fallbackCenter;
+const mapZoom = drive.center ? 9 : fallbackZoom;
+---
+
+<Layout title={drive.name} fullScreen={false}>
+  
+  <main style="padding: 100px 24px 24px 24px; max-width: 1000px; margin: 0 auto; min-height: 100vh;">
+    
+    <nav aria-label="breadcrumb" style="margin-bottom: 24px; font-size: 14px;">
+      <ol style="list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; flex-wrap: wrap;">
+        <li><a href="/" style="color: var(--text-secondary); text-decoration: none;">Home</a></li>
+        <li style="color: var(--text-secondary);">/</li>
+        <li><a href="/fall-foliage-map" style="color: var(--text-secondary); text-decoration: none;">US</a></li>
+        {drive.states && drive.states.length === 1 && (
+          <>
+            <li style="color: var(--text-secondary);">/</li>
+            <li><a href={`/${drive.states[0]}`} style="color: var(--text-secondary); text-decoration: none; text-transform: uppercase;">{drive.states[0]}</a></li>
+          </>
+        )}
+        <li style="color: var(--text-secondary);">/</li>
+        <li style="color: var(--text-secondary);">{drive.name}</li>
+      </ol>
+    </nav>
+
+    <h1 style="font-size: 3rem; margin-bottom: 8px;">{drive.name}</h1>
+    
+    <div style="display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap;">
+      <span style="background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 20px; font-size: 14px; color: var(--text-secondary);">
+        {drive.region}
+      </span>
+      {drive.states && drive.states.map(state => (
+        <span style="background: rgba(249,115,22,0.2); color: var(--accent-color); border: 1px solid rgba(249,115,22,0.4); padding: 4px 12px; border-radius: 20px; font-size: 14px; text-transform: uppercase;">
+          {state}
+        </span>
+      ))}
+    </div>
+
+    <!-- Map Section -->
+    <div style="width: 100%; height: 500px; border-radius: 16px; overflow: hidden; position: relative; margin-bottom: 32px; box-shadow: 0 16px 40px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+      <FoliageMap 
+        client:only="react" 
+        center={mapCenter} 
+        initialZoom={mapZoom} 
+        routeGeoJSON={drive.routeGeoJSON} 
+        peakString={driveLocations.length > 0 ? driveLocations[0].historicalPeak : null}
+      />
+    </div>
+
+    <div class="glass-panel" style="padding: 32px; margin-bottom: 32px;">
+      <p style="font-size: 1.2rem; line-height: 1.6; margin: 0;">
+        {drive.description}
+      </p>
+    </div>
+
+    {drive.highlights && drive.highlights.length > 0 && (
+      <section style="margin-bottom: 48px;">
+        <h2 style="font-size: 1.8rem; margin-bottom: 16px;">Highlights</h2>
+        <ul style="padding-left: 20px; line-height: 1.6; font-size: 1.1rem; color: var(--text-secondary);">
+          {drive.highlights.map(highlight => (
+            <li style="margin-bottom: 12px;">{highlight}</li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    {driveLocations.length > 0 && (
+      <section style="margin-bottom: 48px;">
+        <h2 style="font-size: 1.8rem; margin-bottom: 16px;">Key Locations on this Route</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+          {driveLocations.map(loc => (
+            <a 
+              href={`/${loc.stateSlug}/${loc.slug}`}
+              class="glass-panel"
+              style="padding: 16px; display: block; text-decoration: none; color: inherit; transition: transform 0.2s;"
+            >
+              <h3 style="margin: 0 0 8px 0; font-size: 1.2rem; color: var(--accent-color);">{loc.name}</h3>
+              <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">
+                {loc.cityName}, {loc.stateName}
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {nearbyLocations.length > 0 && (
+      <section style="margin-bottom: 48px;">
+        <h2 style="font-size: 1.8rem; margin-bottom: 16px;">Nearby Locations</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+          {nearbyLocations.slice(0, 6).map(loc => (
+            <a 
+              href={`/${loc.stateSlug}/${loc.slug}`}
+              class="glass-panel"
+              style="padding: 16px; display: block; text-decoration: none; color: inherit; transition: transform 0.2s;"
+            >
+              <h3 style="margin: 0 0 8px 0; font-size: 1.2rem; color: var(--accent-color);">{loc.name}</h3>
+              <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">
+                {loc.cityName}, {loc.stateName}
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {/* Nearby Scenic Drives */}
+    {drives.filter(d => d.slug !== drive.slug && d.region === drive.region).length > 0 && (
+      <section style="margin-top: 64px; margin-bottom: 48px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 48px;">
+        <h2 style="font-size: 1.8rem; margin-bottom: 24px;">Nearby Scenic Drives</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 24px;">
+          {drives.filter(d => d.slug !== drive.slug && d.region === drive.region).slice(0, 6).map(d => (
+            <a href={`/scenic-drives/${d.slug}`} class="glass-panel" style="padding: 24px; display: block; text-decoration: none; color: inherit; transition: transform 0.2s;">
+              <h3 style="margin: 0 0 8px 0; font-size: 1.2rem; color: var(--accent-color);">{d.name}</h3>
+              <p style="margin: 0; font-size: 0.9rem; color: var(--text-secondary);">
+                {d.states && d.states.map(s => s.toUpperCase()).join(', ')}
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+  </main>
+</Layout>
+
+<style>
+  a.glass-panel:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.2);
+  }
+</style>

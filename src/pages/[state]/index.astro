@@ -1,0 +1,177 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs';
+import locations from '../../data/locations.json';
+import statesData from '../../data/states.json';
+import FoliageMap from '../../components/FoliageMap';
+import StateDropdown from '../../components/StateDropdown';
+import fs from 'node:fs';
+import path from 'node:path';
+
+export function getStaticPaths() {
+  return statesData.map(state => ({
+    params: { state: state.stateSlug },
+    props: { 
+      stateName: state.stateName,
+      stateLat: state.lat,
+      stateLng: state.lng,
+      stateZoom: state.zoom,
+      stateLocations: locations.filter(l => l.stateSlug === state.stateSlug)
+    }
+  }));
+}
+
+const { state } = Astro.params;
+const { stateName, stateLat, stateLng, stateZoom, stateLocations } = Astro.props;
+
+// Group locations by city to display hubs (if any exist for this state)
+const hubsMap = new Map();
+stateLocations.forEach(loc => {
+  if (!hubsMap.has(loc.citySlug)) {
+    hubsMap.set(loc.citySlug, {
+      cityName: loc.cityName,
+      citySlug: loc.citySlug,
+      locations: []
+    });
+  }
+  hubsMap.get(loc.citySlug).locations.push(loc);
+});
+const hubs = Array.from(hubsMap.values());
+
+// Load state boundary GeoJSON
+let boundaryGeoJSON = null;
+try {
+  const geojsonData = JSON.parse(fs.readFileSync(path.resolve('public/us-states.json'), 'utf8'));
+  const stateFeature = geojsonData.features.find(f => f.properties.NAME === stateName);
+  if (stateFeature) {
+    boundaryGeoJSON = { type: 'FeatureCollection', features: [stateFeature] };
+  }
+} catch (e) {
+  console.error("Error loading state GeoJSON", e);
+}
+
+const title = `${stateName} Fall Foliage Map, Colors & Tracker 2026 | Leaf Peeper`;
+const description = `Track the best fall colors across ${stateName} with our interactive peak foliage map and latest leaf peeping reports.`;
+
+// Create GeoJSON for the markers (child locations)
+const markersGeoJSON = {
+  type: 'FeatureCollection',
+  features: stateLocations.map(loc => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [loc.coordinates.lng, loc.coordinates.lat]
+    },
+    properties: {
+      name: loc.name
+    }
+  }))
+};
+
+---
+
+<Layout title={title} description={description} fullScreen={true}>
+  <main style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+    <FoliageMap 
+      client:only="react" 
+      center={[stateLat, stateLng]} 
+      initialZoom={stateZoom + 1.2} 
+      peakString={stateLocations.length > 0 ? stateLocations[0].historicalPeak : null}
+      boundaryGeoJSON={boundaryGeoJSON}
+      markersGeoJSON={markersGeoJSON}
+    />
+    <StateDropdown client:load currentStateSlug={state} />
+    
+    <div class="glass-panel state-sidebar">
+      {/* Mobile Handle */}
+      <div class="mobile-handle"></div>
+      
+      <Breadcrumbs stateSlug={state} stateName={stateName} />
+      
+      <h1 style={{ margin: '0 0 16px 0', fontSize: '28px' }}>{stateName} Fall Foliage</h1>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+        Track peak fall colors across {stateName}. Explore the interactive map or browse locations by region.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {hubs.map(hub => (
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.3)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            overflow: 'hidden'
+          }}>
+            <a 
+              href={`/${state}/${hub.citySlug}`}
+              style={{
+                display: 'block',
+                padding: '16px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                textDecoration: 'none',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: '18px' }}>{hub.cityName} Region</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>View Hub &rarr;</span>
+              </div>
+            </a>
+            <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {hub.locations.map(loc => (
+                <a href={`/${state}/${hub.citySlug}/${loc.slug}`} style={{ textDecoration: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{loc.name}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--accent-color)' }}>{loc.currentStatus}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .state-sidebar {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    width: 380px;
+    max-height: calc(100% - 48px);
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .mobile-handle {
+    display: none;
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    margin: 0 auto 16px auto;
+  }
+
+  @media (max-width: 768px) {
+    .state-sidebar {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      border-radius: 24px 24px 0 0;
+      max-height: 50vh;
+      padding: 16px 24px 24px 24px;
+      margin: 0;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+    }
+    
+    .mobile-handle {
+      display: block;
+    }
+  }
+</style>

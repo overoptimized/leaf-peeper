@@ -1,0 +1,200 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import FoliageMap from '../../components/FoliageMap.jsx';
+import regions from '../../data/regions.json';
+import locations from '../../data/locations.json';
+import drives from '../../data/drives.json';
+import fs from 'node:fs';
+import path from 'node:path';
+
+export function getStaticPaths() {
+  return regions.map(region => ({
+    params: { region: region.slug },
+    props: { region },
+  }));
+}
+
+const { region } = Astro.props;
+
+// Get all locations for this region
+const regionLocations = locations.filter(loc => region.states.includes(loc.stateSlug));
+
+// Get all drives that intersect this region
+const regionDrives = drives.filter(drive => drive.states && drive.states.some(s => region.states.includes(s)));
+
+// Load region boundary GeoJSON
+let boundaryGeoJSON = null;
+try {
+  const geojsonData = JSON.parse(fs.readFileSync(path.resolve('public/us-states.json'), 'utf8'));
+  
+  // Create a mapping from slug (e.g. "mi") to Name (e.g. "Michigan")
+  const stateNames = {
+    "me": "Maine", "nh": "New Hampshire", "vt": "Vermont", "ma": "Massachusetts", "ct": "Connecticut", "ri": "Rhode Island",
+    "ny": "New York", "pa": "Pennsylvania", "nj": "New Jersey", "md": "Maryland", "de": "Delaware",
+    "va": "Virginia", "nc": "North Carolina", "sc": "South Carolina", "ga": "Georgia", "fl": "Florida",
+    "tn": "Tennessee", "al": "Alabama", "ms": "Mississippi", "ar": "Arkansas", "la": "Louisiana",
+    "oh": "Ohio", "mi": "Michigan", "in": "Indiana", "il": "Illinois", "wi": "Wisconsin", "mn": "Minnesota",
+    "ia": "Iowa", "mo": "Missouri", "nd": "North Dakota", "sd": "South Dakota", "ne": "Nebraska", "ks": "Nebraska", "ks": "Kansas",
+    "mt": "Montana", "wy": "Wyoming", "co": "Colorado", "ut": "Utah", "id": "Idaho", "nv": "Nevada",
+    "ca": "California", "or": "Oregon", "wa": "Washington", "ak": "Alaska", "hi": "Hawaii",
+    "az": "Arizona", "nm": "New Mexico", "tx": "Texas", "ok": "Oklahoma"
+  };
+
+  const requiredStateNames = region.states.map(s => stateNames[s]);
+  const regionFeatures = geojsonData.features.filter(f => requiredStateNames.includes(f.properties.NAME));
+  
+  if (regionFeatures.length > 0) {
+    boundaryGeoJSON = { type: 'FeatureCollection', features: regionFeatures };
+  }
+} catch (e) {
+  console.error("Error loading region GeoJSON", e);
+}
+
+// Create GeoJSON for the markers (region locations)
+const markersGeoJSON = {
+  type: 'FeatureCollection',
+  features: regionLocations.map(loc => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [loc.coordinates.lng, loc.coordinates.lat]
+    },
+    properties: {
+      name: loc.name
+    }
+  }))
+};
+
+---
+
+<Layout title={`${region.name} Fall Foliage Map & Reports`} fullScreen={true}>
+  <main style="position: relative; width: 100%; height: 100%; overflow: hidden;">
+    <FoliageMap 
+      client:only="react" 
+      center={region.center} 
+      initialZoom={region.zoom} 
+      peakString={regionLocations.length > 0 ? regionLocations[0].historicalPeak : null}
+      boundaryGeoJSON={boundaryGeoJSON}
+      markersGeoJSON={markersGeoJSON}
+    />
+
+    <div class="glass-panel state-sidebar">
+      {/* Mobile Handle */}
+      <div class="mobile-handle"></div>
+      
+      <nav aria-label="breadcrumb" style="margin-bottom: 24px; font-size: 14px;">
+        <ol style="list-style: none; padding: 0; margin: 0; display: flex; gap: 8px; flex-wrap: wrap;">
+          <li><a href="/" style="color: var(--text-secondary); text-decoration: none;">Home</a></li>
+          <li style="color: var(--text-secondary);">/</li>
+          <li><a href="/fall-foliage-map" style="color: var(--text-secondary); text-decoration: none;">US</a></li>
+          <li style="color: var(--text-secondary);">/</li>
+          <li style="color: var(--text-secondary);">{region.name}</li>
+        </ol>
+      </nav>
+
+      <h1 style={{ margin: '0 0 16px 0', fontSize: '28px' }}>{region.name} Fall Foliage</h1>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+        {region.description}
+      </p>
+
+      {regionLocations.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Top Locations</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {regionLocations.map(loc => (
+              <a 
+                href={`/${loc.stateSlug}/${loc.citySlug}/${loc.slug}`}
+                style={{
+                  padding: '16px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  transition: 'background 0.2s, border-color 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600 }}>{loc.name}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--accent-color)' }}>{loc.currentStatus}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{loc.cityName}, {loc.stateName}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {regionDrives.length > 0 && (
+        <div>
+          <h2 style={{ fontSize: '1.2rem', marginBottom: '16px', color: 'var(--text-primary)' }}>Scenic Drives</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {regionDrives.map(drive => (
+              <a 
+                href={`/scenic-drives/${drive.slug}`}
+                style={{
+                  padding: '16px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  transition: 'background 0.2s, border-color 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: '4px' }}>{drive.name}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {drive.states && drive.states.map(s => s.toUpperCase()).join(', ')}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .state-sidebar {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    width: 380px;
+    max-height: calc(100% - 48px);
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .mobile-handle {
+    display: none;
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    margin: 0 auto 16px auto;
+  }
+
+  @media (max-width: 768px) {
+    .state-sidebar {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      border-radius: 24px 24px 0 0;
+      max-height: 50vh;
+      padding: 16px 24px 24px 24px;
+      margin: 0;
+      border-left: none;
+      border-right: none;
+      border-bottom: none;
+    }
+    
+    .mobile-handle {
+      display: block;
+    }
+  }
+</style>

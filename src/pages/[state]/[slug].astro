@@ -1,0 +1,57 @@
+---
+import locations from '../../data/locations.json';
+import drives from '../../data/drives.json';
+import fs from 'fs';
+import path from 'path';
+import CityHubView from '../../views/CityHubView.astro';
+import LocationView from '../../views/LocationView.astro';
+
+let phenologyData = {};
+try {
+  phenologyData = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'src/data/historical-phenology.json'), 'utf8'));
+} catch(e) {}
+
+export function getStaticPaths() {
+  const paths = [];
+  
+  // 1. Add all City Hubs
+  locations.forEach(loc => {
+    if (!paths.find(p => p.params.slug === loc.citySlug && p.params.state === loc.stateSlug)) {
+      paths.push({
+        params: { state: loc.stateSlug, slug: loc.citySlug },
+        props: { 
+          type: 'city',
+          stateName: loc.stateName, 
+          cityName: loc.cityName,
+          citySlug: loc.citySlug,
+          stateLocations: locations.filter(l => l.stateSlug === loc.stateSlug),
+          stateDrives: drives.filter(d => d.states.includes(loc.stateSlug))
+        }
+      });
+    }
+  });
+
+  // 2. Add all Locations (skip if they match a citySlug!)
+  locations.forEach(loc => {
+    if (!paths.find(p => p.params.slug === loc.slug && p.params.state === loc.stateSlug)) {
+      paths.push({
+        params: { state: loc.stateSlug, slug: loc.slug },
+        props: { 
+          type: 'location',
+          location: loc
+        }
+      });
+    }
+  });
+  
+  return paths;
+}
+
+const { type } = Astro.props;
+---
+
+{type === 'city' ? (
+  <CityHubView {...Astro.props} fullPhenologyData={phenologyData} />
+) : (
+  <LocationView {...Astro.props} historicalPhenology={phenologyData[Astro.props.location.slug]} />
+)}

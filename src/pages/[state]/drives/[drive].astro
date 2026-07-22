@@ -1,0 +1,67 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Breadcrumbs from '../../../components/Breadcrumbs';
+import drives from '../../../data/drives.json';
+import FoliageMap from '../../../components/FoliageMap';
+import StateDropdown from '../../../components/StateDropdown';
+
+export function getStaticPaths() {
+  const pages = [];
+  drives.forEach(drive => {
+    drive.states.forEach(stateSlug => {
+      pages.push({
+        params: { state: stateSlug, drive: drive.slug },
+        props: { drive }
+      });
+    });
+  });
+  return pages;
+}
+
+const { state, drive } = Astro.params;
+const { drive: driveData } = Astro.props;
+
+const title = `${driveData.name} Fall Foliage Scenic Drive`;
+const description = driveData.description;
+
+const routeGeoJSON = driveData.routeGeoJSON;
+const center = driveData.center || [39.8283, -98.5795];
+---
+
+<Layout title={title} description={description} fullScreen={false}>
+  <section style="position: relative; width: 100%; height: 60vh; min-height: 400px; overflow: hidden; background: #1a1a1a;">
+    <div style="position: absolute; top: 24px; right: 24px; z-index: 1000;">
+      <StateDropdown client:only="react" currentState={state} />
+    </div>
+
+    <FoliageMap 
+      client:only="react" 
+      center={[center[0], center[1]]} 
+      initialZoom={9} 
+      routeGeoJSON={routeGeoJSON}
+    />
+  </section>
+
+  <section class="content-section" style="max-width: 1200px; margin: 48px auto; padding: 0 24px; color: var(--text-primary);">
+    <Breadcrumbs stateSlug={state} stateName={state.toUpperCase()} locationName={driveData.name} />
+    
+    <div style="max-width: 800px; margin: 32px 0;">
+      <h1 style="font-size: 36px; font-weight: 700; margin-bottom: 24px; color: var(--text-primary);">
+        {driveData.name}
+      </h1>
+      
+      <div style="font-size: 18px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 32px; white-space: pre-wrap;">
+        {driveData.description}
+      </div>
+
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 32px; border-radius: 12px;">
+        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 16px; color: var(--accent-color);">
+          Drive Highlights
+        </h3>
+        <p style="font-size: 16px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;">
+          {driveData.highlights}
+        </p>
+      </div>
+    </div>
+  </section>
+</Layout>

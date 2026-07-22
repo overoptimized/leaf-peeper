@@ -1,0 +1,34 @@
+[
+  {
+    "slug": "new-england",
+    "name": "New England",
+    "description": "Experience the world-famous fall colors of New England, featuring vibrant maples and stunning mountain vistas across Maine, New Hampshire, Vermont, Massachusetts, Connecticut, and Rhode Island.",
+    "states": ["me", "nh", "vt", "ma", "ct", "ri"],
+    "center": [43.9, -71.5],
+    "zoom": 5.5
+  },
+  {
+    "slug": "blue-ridge-mountains",
+    "name": "Blue Ridge Mountains",
+    "description": "The Blue Ridge Mountains offer an incredibly long and vibrant fall foliage season due to the varied elevations, stretching from Virginia down through North Carolina and Georgia.",
+    "states": ["va", "nc", "ga", "tn", "sc"],
+    "center": [36.0, -81.5],
+    "zoom": 5.5
+  },
+  {
+    "slug": "northeast",
+    "name": "The Northeast",
+    "description": "The Northeast transforms into a kaleidoscope of colors each autumn. From the peaks of the Adirondacks to the shores of New Jersey.",
+    "states": ["ny", "pa", "nj", "md", "de", "me", "nh", "vt", "ma", "ct", "ri"],
+    "center": [42.0, -74.0],
+    "zoom": 5
+  },
+  {
+    "slug": "east-coast",
+    "name": "East Coast",
+    "description": "Track the fall colors as they sweep down the East Coast, from the early peaks in Maine to the late season warmth in the Carolinas.",
+    "states": ["me", "nh", "vt", "ma", "ct", "ri", "ny", "pa", "nj", "md", "de", "va", "nc", "sc", "ga", "fl"],
+    "center": [39.0, -76.0],
+    "zoom": 4
+  }
+]

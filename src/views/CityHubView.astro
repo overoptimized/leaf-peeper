@@ -1,0 +1,148 @@
+---
+import fs from 'fs';
+import path from 'path';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { point } from '@turf/helpers';
+import Layout from '../layouts/Layout.astro';
+import FoliageMap from '../components/FoliageMap';
+import StateDropdown from '../components/StateDropdown';
+import HubSidebar from '../components/HubSidebar';
+
+const { state, slug } = Astro.params;
+const city = slug;
+const { 
+	stateName, 
+	stateSlug, 
+	cityName, 
+	citySlug, 
+	stateLocations, 
+	stateDrives,
+	fullPhenologyData
+} = Astro.props;
+
+// 1. Calculate the center of the hub based on average of locations (or just use the first location's coords)
+const cityLocations = stateLocations.filter(l => l.citySlug === city);
+const centerLocation = cityLocations.length > 0 ? cityLocations[0] : stateLocations[0];
+const centerLat = centerLocation.coordinates.lat;
+const centerLng = centerLocation.coordinates.lng;
+
+const title = `${cityName}, ${stateName} Fall Foliage Tracker & Map 2026`;
+const description = `Find the best spots for fall colors near ${cityName}. Track peak foliage with our interactive map and leaf peeping reports.`;
+
+// Create GeoJSON for ALL state markers
+const markersGeoJSON = {
+  type: 'FeatureCollection',
+  features: stateLocations.map(loc => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [loc.coordinates.lng, loc.coordinates.lat]
+    },
+    properties: {
+      name: loc.name
+    }
+  }))
+};
+
+// Combine all drive routes into one FeatureCollection
+const routeFeatures = [];
+stateDrives.forEach(drive => {
+  if (drive.routeGeoJSON) {
+    if (drive.routeGeoJSON.type === 'FeatureCollection') {
+      routeFeatures.push(...drive.routeGeoJSON.features);
+    } else if (drive.routeGeoJSON.type === 'Feature') {
+      routeFeatures.push(drive.routeGeoJSON);
+    }
+  }
+});
+const combinedRoutesGeoJSON = routeFeatures.length > 0 ? {
+  type: 'FeatureCollection',
+  features: routeFeatures
+} : null;
+
+// Determine County Boundary for this Hub
+const countiesPath = path.join(process.cwd(), 'src/data/us-counties.json');
+let boundaryGeoJSON = null;
+if (fs.existsSync(countiesPath)) {
+  const usCounties = JSON.parse(fs.readFileSync(countiesPath, 'utf8'));
+  const pt = point([centerLng, centerLat]);
+  for (const feature of usCounties.features) {
+    if (feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')) {
+      if (booleanPointInPolygon(pt, feature)) {
+        boundaryGeoJSON = feature;
+        break;
+      }
+    }
+  }
+}
+
+---
+
+<Layout title={title} description={description} fullScreen={false}>
+  {/* Hero Map Section (dominant focus, taking up most of viewport) */}
+  <section style="position: relative; width: 100%; height: 85vh; min-height: 600px; overflow: hidden; background: #1a1a1a;">
+    
+    <div style="position: absolute; top: 24px; right: 24px; z-index: 1000; display: flex; gap: 12px;">
+      <a href="/reports" style="background: var(--accent-color); color: white; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);">
+        Color Report
+      </a>
+      <StateDropdown client:only="react" currentState={state} />
+    </div>
+
+    <FoliageMap 
+      client:only="react" 
+      center={[centerLat, centerLng]} 
+      initialZoom={9} 
+      peakString={cityLocations.length > 0 ? cityLocations[0].historicalPeak : null}
+      markersGeoJSON={markersGeoJSON}
+      routeGeoJSON={combinedRoutesGeoJSON}
+      boundaryGeoJSON={boundaryGeoJSON}
+    />
+    
+    <HubSidebar 
+      client:load 
+      stateSlug={state} 
+      stateName={stateName} 
+      citySlug={city} 
+      cityName={cityName} 
+      stateLocations={stateLocations} 
+      stateDrives={stateDrives} 
+      centerLat={centerLat} 
+      centerLng={centerLng} 
+      fullPhenologyData={fullPhenologyData}
+    />
+  </section>
+
+  {/* Content Area Below Map */}
+  <section class="content-section" style="max-width: 1200px; margin: 64px auto; padding: 0 24px; color: var(--text-primary);">
+    <div style="max-width: 800px; margin: 0 auto;">
+      <h2 style="font-size: 32px; font-weight: 700; margin-bottom: 24px; color: var(--text-primary);">
+        Planning Your Trip to {cityName}
+      </h2>
+      <p style="font-size: 18px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 32px;">
+        {cityName} is a premier destination for fall foliage enthusiasts. This hub serves as a perfect basecamp to explore 
+        the vibrant colors of {stateName}. With {stateLocations.length} stunning locations and {stateDrives.length} scenic byways 
+        accessible from the area, you can easily plan day trips ranging from a quick one-hour hike to full-day scenic drives.
+      </p>
+
+      <h3 style="font-size: 24px; font-weight: 600; margin-top: 48px; margin-bottom: 16px; color: var(--text-primary);">
+        When to Visit
+      </h3>
+      <p style="font-size: 16px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 24px;">
+        Based on historical data and our prediction models, the best time to see peak fall foliage around {cityName} typically falls in <strong>{cityLocations.length > 0 ? cityLocations[0].historicalPeak : 'Mid October'}</strong>. Keep an eye on our interactive map above as the season approaches—we update the live color status daily.
+      </p>
+      
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 32px; border-radius: 12px; margin-top: 48px;">
+        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--accent-color);">
+          Have updates on the colors in {cityName}?
+        </h3>
+        <p style="font-size: 15px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+          Our models are good, but eyes on the ground are better. Help thousands of other leaf peepers by submitting a live color report if you are in the area.
+        </p>
+        <a href="/reports" style="display: inline-block; background: var(--accent-color); color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">
+          Submit a Report
+        </a>
+      </div>
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,70 @@
+---
+import Layout from '../layouts/Layout.astro';
+import statesData from '../data/states.json';
+import locationsData from '../data/locations.json';
+
+// Group locations by state, then by city
+const groupedData = statesData.map(state => {
+  const stateLocations = locationsData.filter(loc => loc.stateSlug === state.stateSlug);
+  
+  const hubsMap = new Map();
+  stateLocations.forEach(loc => {
+    if (!hubsMap.has(loc.citySlug)) {
+      hubsMap.set(loc.citySlug, {
+        cityName: loc.cityName,
+        citySlug: loc.citySlug,
+        locations: []
+      });
+    }
+    hubsMap.get(loc.citySlug).locations.push(loc);
+  });
+  
+  return {
+    ...state,
+    hubs: Array.from(hubsMap.values())
+  };
+});
+---
+
+<Layout title="Sitemap - Leaf Peeper" fullScreen={false}>
+  <main style="max-width: 800px; margin: 0 auto; padding: 60px 24px;">
+    <h1 style={{ fontSize: '36px', marginBottom: '16px' }}>Sitemap</h1>
+    <p style={{ color: 'var(--text-secondary)', marginBottom: '40px', fontSize: '18px' }}>
+      Navigate through all our interactive fall foliage maps and scenic viewing hubs across the United States.
+    </p>
+
+    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '32px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '40px' }}>
+      <h2 style={{ fontSize: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px', marginBottom: '24px' }}>
+        Core Pages
+      </h2>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <li><a href="/" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '18px' }}>Home - US Map</a></li>
+        <li><a href="/fall-foliage-map" style={{ color: 'var(--accent-color)', textDecoration: 'none', fontSize: '18px' }}>Interactive National Map</a></li>
+      </ul>
+    </div>
+
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '24px' }}>
+      {groupedData.map(state => (
+        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '20px' }}>
+            <a href={`/${state.stateSlug}`} style={{ color: '#fff', textDecoration: 'none' }}>
+              {state.stateName}
+            </a>
+          </h3>
+          
+          {state.hubs.length > 0 && (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {state.hubs.map(hub => (
+                <li>
+                  <a href={`/${state.stateSlug}/${hub.citySlug}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px' }}>
+                    {hub.cityName} Region
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+    </div>
+  </main>
+</Layout>

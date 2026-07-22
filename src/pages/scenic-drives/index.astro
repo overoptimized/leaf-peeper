@@ -1,0 +1,47 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import TopNav from '../../components/TopNav.jsx';
+import drives from '../../data/drives.json';
+
+const regions = [...new Set(drives.map(drive => drive.region))];
+---
+
+<Layout title="Scenic Fall Drives" fullScreen={false}>
+  
+  <main style="padding: 100px 24px 24px 24px; max-width: 1200px; margin: 0 auto; min-height: 100vh;">
+    <h1 style="font-size: 3rem; margin-bottom: 8px;">Top Fall Scenic Drives</h1>
+    <p style="color: var(--text-secondary); margin-bottom: 48px; font-size: 1.2rem;">
+      Explore some of the most iconic foliage routes across the country.
+    </p>
+
+    {regions.map(region => (
+      <section style="margin-bottom: 48px;">
+        <h2 style="font-size: 2rem; color: var(--accent-color); margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+          {region}
+        </h2>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px;">
+          {drives.filter(d => d.region === region).map(drive => (
+            <a 
+              href={`/scenic-drives/${drive.slug}`}
+              class="glass-panel"
+              style="display: block; padding: 24px; text-decoration: none; color: inherit; transition: transform 0.2s;"
+            >
+              <h3 style="margin: 0 0 12px 0; font-size: 1.4rem;">{drive.name}</h3>
+              <p style="margin: 0; color: var(--text-secondary); line-height: 1.5; font-size: 0.95rem;">
+                {drive.description.substring(0, 100)}...
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </main>
+</Layout>
+
+<style>
+  a.glass-panel:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.2);
+  }
+</style>

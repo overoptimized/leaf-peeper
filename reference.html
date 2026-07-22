@@ -1,0 +1,239 @@
+<USER_REQUEST>
+can we better mimic this map output while still being SEO friendly?
+
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <!-- <meta name="robots" content="noindex"> -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fall Foliage Map 2026: Daily Updates and Forecasts!</title>
+    <meta name="description" content="Get real-time fall foliage updates and find the best fall color with our interactive map. Plan your fall trip today!"/>
+    <meta content="Fall Foliage Map 2026: Daily Updates and Forecasts!" property="og:title"/>
+    <meta content="Get real-time fall foliage updates and find the best fall color with our interactive map. Plan your fall trip today!" property="og:description"/>
+    <meta name="twitter:card" content="summary_large_image"/>
+    <meta name="twitter:site" content="@ExploreFall" />
+    <meta name="twitter:title" content="Fall Foliage Map 2026: Daily Updates and Forecasts!"/>
+    <meta name="twitter:description" content="Get real-time fall foliage updates and find the best fall color with our interactive map. Plan your fall trip today!"/>
+    <meta name="twitter:image" content="https://www.explorefall.com/images/2024-map-example.png" />
+    <meta property="og:type" content="website"/>
+    <meta content="summary_large_image" name="twitter:card"/>
+    <meta name="geo.placename" content="United States"/>
+    <meta http-equiv="content-language" content="en-us">
+    <link rel="stylesheet" href="./css/master.css">
+    <link rel="stylesheet" href="./css/fall-foliage-map.css">
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+    <link rel="manifest" href="./site.webmanifest">
+    <link rel="mask-icon" href="./safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+    <script src='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css' rel='stylesheet' />
+    <!-- <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script> -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.10.0/proj4.js'></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7741939386451882" crossorigin="anonymous"></script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-R5CF4C5DDC"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-R5CF4C5DDC');
+    </script>
+    <script type="text/javascript">
+        (function(c,l,a,r,i,t,y){
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        })(window, document, "clarity", "script", "n6an4ao29a");
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TouristAttraction",
+      "name": "2026 Fall Foliage Map",
+      "description": "Explore real-time fall foliage maps and find the best fall color in 2026.",
+      "url": "https://www.explorefall.com/"
+    }
+    </script>
+  </head>
+  <body>
+    <div class="header">
+      <div class="header-end-l" onclick="navigateToPage('./')">
+        <img src="./images/2024-logo-v1.png" alt="Explore Fall logo" class="header-logo">
+      </div>
+      <div class="header-middle">
+        <a class="header-page" href="./">Home</a>
+        <a class="header-page active" href="./fall-foliage-map">Live Map</a>
+        <a class="header-page" href="./fall-foliage-map-archive">Map Archive</a>
+        <a class="header-page" href="./blog/home">Blog</a>
+        <a class="header-page" href="./additional-resources">Resources</a>
+        <a class="header-page" href="./about">About</a>
+      </div>
+      <div class="header-end-r">
+        <div class="header-contact" onclick="navigateToPage('mailto:evan@explorefall.com?subject=Explore%20Fall%20Inquiry!')">Contact Us</div>
+        <div class="header-menu-icon" id="menu-icon">
+          <img src="./images/menu-icon.png" alt="menu icon">
+        </div>
+        <div id="header-menu-dropdown">
+          <a class="header-page-dd" href="./">Home</a>
+          <a class="header-page-dd active" href="./fall-foliage-map">Live Map</a>
+          <a class="header-page-dd" href="./fall-foliage-map-archive">Map Archive</a>
+          <a class="header-page-dd" href="./blog/home">Blog</a>
+          <a class="header-page-dd" href="./additional-resources">Resources</a>
+          <a class="header-page-dd" href="./about">About</a>
+        </div>
+      </div>
+    </div>
+    <h1>Fall Foliage Map 2026</h1>
+    <div class="sm-icons">
+      <a href="https://www.facebook.com/groups/3513868095547240/" target="_blank"><img src="./images/facebook.png" alt="Facebook Icon"></a>
+      <a href="https://www.instagram.com/explorefall/" target="_blank"><img src="./images/instagram.png" alt="Instagram Icon"></a>
+      <a href="https://twitter.com/ExploreFall" target="_blank"><img src="./images/x.png" alt="Twitter Icon"></a>
+      <a href="https://www.buymeacoffee.com/explorefall" target="_blank"><img src="./images/buymeacoffee.png" alt="Buy Me a Coffee Icon"></a>
+    </div>
+    <div class="mobile-controls-container" id="mobile">
+
+    </div>
+    <div class="primary-container">
+      <div id="left-ad-container" class="map-wing">
+      </div>
+      <div class="map-container">
+        <div class="legend-container" id="legend-container">
+          <div class="legend-subcontainer">
+            <div class="legend-pair"><span style="background-color:#689C4B;"></span><p>Little to No Color</p></div>
+            <div class="legend-pair"><span style="background-color:#F6ED5F;"></span><p>Low Color</p></div>
+            <div class="legend-pair"><span style="background-color:#FFA228;"></span><p>Moderate Color</p></div>
+          </div>
+          <div class="legend-subcontainer">
+            <div class="legend-pair"><span style="background-color:#D45C17;"></span><p>High Color</p></div>
+            <div class="legend-pair"><span style="background-color:#a30f10;"></span><p>Peak Color</p></div>
+            <div class="legend-pair"><span style="background-color:#4d2b0f;"></span><p>Past Peak Color</p></div>
+          </div>
+        </div>
+        <div class="slider-container">
+          <div class="date-info-container" id="slider-controls">
+            <p id="slider-title" class="slider-title">September 2, 2026: Estimate</p>
+            <img src="./images/question-icon.png" alt="more info icon" id="date-info-icon">
+          </div>
+          <input type="range" id="slider-date" class="slider-date" min="0" max="121" value="1" step="1">
+        </div>
+        <div class="controls-container">
+          <div class="search-container">
+              <!-- <p class="controls-header">Search a location...</p> -->
+              <input type="text" id="location-input" placeholder="Search a location...">
+              <div class="autocomplete-container" id="suggestionsContainer"></div>
+          </div>
+          <div class="layer-container">
+            <div class="controls-toggle active-layer" id="colorreport">
+              <p>Color Report</p>
+            </div>
+            <div class="controls-toggle" id="confidence">
+              <p>Peak Timing</p>
+            </div>
+          </div>
+          <div class="layer-container">
+            <div class="controls-toggle active-layer" id="lowres">
+              <p>Low-Res</p>
+            </div>
+            <div class="controls-toggle" id="highres">
+              <p>High-Res</p>
+            </div>
+          </div>
+          <div class="layer-container">
+            <div class="controls-toggle active-layer" id="verified">
+              <p>Reports</p>
+            </div>
+          </div>
+          <div class="layer-container">
+            <div class="controls-toggle active-layer" id="download">
+              <p>Download</p>
+            </div>
+          </div>
+        </div>
+        <div id="map" class="primary-webmap" data-clarity-unmask="true"></div>
+        <p id="blank-text">Coming Fall 2026</p>
+        <div id="date-info-text">This map is an estimate of fall foliage conditions on the posted date. All maps are updated daily to reflect deviations from normal due to real-time weather conditions.</div>
+        <div class="attribution">
+          <p id="attribution-left"></p>
+          <p id="attribution-right">Powered by Esri</p>
+        </div>
+      </div>
+      <div id="right-ad-container" class="map-wing">
+      </div>
+    </div>
+    <p id="map-description">Fall is nearly upon us, and we're once again helping fall foliage enthusiasts across the country find the best fall color! Use our map to explore the estimated timing of fall foliage throughout the United States, allowing you to plan trips with confidence this year. Check back regularly for updates based on the latest reports gathered from hundreds of sources throughout the country.</p>
+    <div class="container-new">
+      <div class="left-div-2">
+        <img src="./images/Public/DJI_0209-Edit.jpg" alt="Peak fall foliage in Virginia" style="width:80%;border-radius:15px;margin-left:auto;margin-right:auto;display:block;margin-top:50px;">
+      </div>
+      <div class="right-div-2" id="right-div-2">
+        <h2 class="heading-small">The Science of Fall Color</h2>
+        <div class="more-info" id="more-info-2">
+          <p>Two primary factors control the timing of fall foliage: daylight and temperature. This means that the further north and the higher in elevation a tree is, the earlier it will reveal it's colorful canopy. Photosynthesis grinds to a halt when the days grow short in the fall, and leaves no longer have a need for their excess stores of chlorophyll.</p>
+          <p>Over the course of a month or two, the concentrations of chlorophyll diminish, allowing less concentrated chemicals such as anthocyanin and carotenoids to dominate, turning the leaf red, yellow, or orange. The rate at which this change occurs varies amongst tree species, so it can be difficult to pinpoint a single peak in fall foliage.</p>
+          <p>Nevertheless, when the vast majority of trees in a particular area have full canopies of autumnal color, peak has arrived. Some areas, partiularly in the Northeast, experience vibrant red peaks due to an abundance of maple trees, while others experience a mixture of all of fall's colors. Different trees display different colors, giving each region its own unique peak.</p>
+        </div>
+        <div id="learn-more-button-2" onclick="toggleMoreInfo2()" class="learn-more-button">
+          Learn More
+        </div>
+      </div>
+    </div>
+    <div class="container-new">
+      <div class="left-div-3">
+        <h2 class="heading-small">When Does Peak Arrive?</h2>
+        <div class="more-info" id="more-info-3">
+          <p>For most of the United States, peak fall color arrives in the month of October. This is when wide swaths of the Northeast, Midwest, and Western states are aglow with bright fall foliage, and more than 80% of travelers make their fall foliage trips. Some less-populated regions will peak in September (August in northern Alaska), while the southernmost states hold off until mid-November.</p>
+          <p>The most popular fall foliage displays are found in New England, where approximately ten million people travel each year in hopes of photographing or simply walking through fall's splendor. Northern Vermont, New Hampshire, and northwestern Maine experience peak in early October, while much of New York, Massachusetts, and Pennsylvania have to wait until later in the month.</p>
+          <p>Out west, golden Aspens peak in sweeping displays in late September and early October, just prior to the invasive chill of winter. Non-desert, lower elevations in the Northwest are further delayed into late October/early November; however, the wait is well worth it.</p>
+        </div>
+        <div id="learn-more-button-3" onclick="toggleMoreInfo3()" class="learn-more-button">
+          Learn More
+        </div>
+      </div>
+      <div class="right-div-3">
+        <img src="./images/blog/1991 to 2020 Normal Peak.png" alt="Timing of peak fall foliage" style="width:90%;border-radius:15px;margin-left:auto;margin-right:auto;display:block;margin-top:20px;">
+      </div>
+    </div>
+    <div class="container-new">
+      <div class="left-div-4">
+        <img src="./images/blog/IMG_0327.jpg" alt="Fall foliage on the Blue Ridge Parkway" style="width:90%;border-radius:15px;margin-left:auto;margin-right:auto;display:block;margin-top:70px;">
+      </div>
+      <div class="right-div-4">
+        <h2 class="heading-small">Planning a Fall Trip</h2>
+        <div class="more-info" id="more-info-4">
+          <p>If you've ever traveled in search of fall foliage before, you likely know how tricky it can be to be in the right place at the right time. The timing of peak color varies signficantly season-to-season, meaning what worked one year might not work the next! The best fall trips take careful planning, a lot of patience, and a reliable fall foliage map.</p>
+          <p>It's helpful to establish a baseline for when leaves <i>normally</i> change. Maps, like the one in the above section, can help you identify roughly when in the season you should be planning your trip. From there, you should consult a real-time fall foliage map like ours to see if fall foliage is on-time or running early/late due to ongoing weather conditions.</p>
+          <p>If at all possible, don't solidify your plans until you're two weeks out from peak fall foliage. This allows you to be flexible should extreme weather rear its head and disrupt the normal progression of fall foliage. Should that not be an option for you, do your planning in early September when fall foliage experts can give you an idea of whether or not fall color is on-time this year.</p>
+          <p>You'll want to make the most of your time in fall's splendor, so be sure to pick out a few beautiful hikes or drives on which you can truly be emersed in autumnal glory. If you're looking to beat the crowds, consider going to popular locations very early in the morning, before the majority of people arrive. Sunrise bathes fall foliage in golden hues, making early morning one of the best times to venture out!</p>
+        </div>
+        <div id="learn-more-button-4" onclick="toggleMoreInfo4()" class="learn-more-button">
+          Learn More
+        </div>
+      </div>
+    </div>
+    <div class="commercial-container">
+      <h4 class="commercial-title">Commercial Interest?</h4>
+      <p class="paragraph-light" id="commercial-use"></p>
+      <div class="commerical-inquire-button" onclick="navigateToPage('mailto:evan@explorefall.com?subject=Explore%20Fall%20Inquiry!')">Inquire Here</div>
+    </div>
+    <p id="copyright" class="paragraph-light"></p>
+    <script type="text/javascript" src="./js/basic.js"></script>
+    <script type="text/javascript" src="./js/fall-foliage-map.js"></script>
+    <script type="text/javascript" src="./js/fall-foliage-map-reports.js"></script>
+    <!-- <script type="text/javascript" src="./js/fall-foliage-charts.js"></script> -->
+    <script type="text/javascript" src="./js/conus-map-layers.js"></script>
+    <script type="text/javascript" src="./js/location-highlights.js"></script>
+    <script type="text/javascript" src="./js/report-card.js"></script>
+  </body>
+</html>
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-20T14:09:30-06:00.
+</ADDITIONAL_METADATA>

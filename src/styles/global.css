@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg-color: #0b0f19;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-color: #f97316; /* Autumn orange */
+  --accent-glow: rgba(249, 115, 22, 0.4);
+  --glass-bg: rgba(15, 23, 42, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  /* overflow: hidden removed to allow scrolling on homepage */
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+}
+
+/* Map specific overrides for dark mode aesthetic */
+.leaflet-container {
+  background: #0b0f19 !important;
+  font-family: 'Outfit', sans-serif;
+}
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.leaflet-control-zoom a {
+  background: var(--glass-bg) !important;
+  color: var(--text-primary) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 0 !important;
+  transition: all 0.2s ease;
+}
+.leaflet-control-zoom a:hover {
+  background: rgba(30, 41, 59, 0.9) !important;
+  color: var(--accent-color) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(11, 15, 25, 0.7) !important;
+  color: var(--text-secondary) !important;
+  backdrop-filter: blur(4px);
+  border-radius: 4px 0 0 0;
+}
+.leaflet-control-attribution a {
+  color: var(--accent-color) !important;
+}
+
+/* Smooth out the USA-NPN raster tiles */
+.foliage-wms {
+  filter: blur(4px) saturate(1.5) contrast(1.1);
+  image-rendering: auto !important; /* Override Leaflet crisp-edges */
+}
+
+/* Nav Dropdown CSS */
+.nav-item-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.nav-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  z-index: 2100;
+}
+
+.nav-dropdown a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.nav-dropdown a:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.05);
+}
+
+.nav-item-container:hover .nav-dropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}

@@ -1,0 +1,22 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import FoliageMap from '../../components/FoliageMap';
+import LocationDetails from '../../components/LocationDetails';
+import locations from '../../data/locations.json';
+
+export function getStaticPaths() {
+  return locations.map((location) => ({
+    params: { slug: location.slug },
+    props: { location },
+  }));
+}
+
+const { location } = Astro.props;
+---
+
+<Layout>
+	<main style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
+		<FoliageMap client:only="react" center={[location.coordinates.lat, location.coordinates.lng]} initialZoom={10} />
+		<LocationDetails client:load location={location} />
+	</main>
+</Layout>

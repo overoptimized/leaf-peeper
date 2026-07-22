@@ -1,0 +1,70 @@
+---
+import '../styles/global.css';
+import TopNav from '../components/TopNav';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: string;
+  fullScreen?: boolean;
+}
+
+const { 
+  title = "Leaf Peeper | Fall Foliage Tracker",
+  description = "Get real-time fall foliage updates and find the best fall color with our interactive map. Plan your fall trip today!",
+  image = "/images/og-image.jpg",
+  type = "website",
+  fullScreen = true
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		
+    <!-- SEO Meta Tags -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={image} />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content={image} />
+    
+    <slot name="head" />
+	</head>
+	<body>
+		<TopNav client:load />
+    {fullScreen ? (
+      <div style="height: calc(100vh - 60px); position: relative; overflow: hidden; width: 100vw;">
+        <slot />
+      </div>
+    ) : (
+      <div style="min-height: calc(100vh - 60px); width: 100vw; display: flex; flex-direction: column;">
+        <div style="flex: 1;">
+          <slot />
+        </div>
+        <footer style="background: #111; color: #888; text-align: center; padding: 40px 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <span style="font-size: 14px;">&copy; 2026 Leaf Peeper</span>
+            <div style="display: flex; gap: 24px;">
+              <a href="/sitemap" style="color: #aaa; text-decoration: none; font-size: 14px; transition: color 0.2s;">Sitemap</a>
+            </div>
+          </div>
+        </footer>
+      </div>
+    )}
+	</body>
+</html>

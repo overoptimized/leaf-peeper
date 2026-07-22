@@ -1,0 +1,56 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+  const reportEntries = await getCollection('reports');
+  return reportEntries.map(entry => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+---
+
+<Layout>
+  <div style={{ maxWidth: '800px', margin: '0 auto', padding: '48px 24px' }}>
+    <div style={{ color: 'var(--accent-color)', fontWeight: 600, marginBottom: '8px' }}>FOLIAGE REPORT</div>
+    <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>{entry.data.title}</h1>
+    <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)', marginBottom: '32px' }}>
+      {entry.data.date && <span>{entry.data.date}</span>}
+      {entry.data.location && <span>📍 {entry.data.location}</span>}
+    </div>
+    
+    {entry.data.description && <p style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '48px', lineHeight: 1.6 }}>{entry.data.description}</p>}
+    
+    <div className="prose">
+      <Content />
+    </div>
+  </div>
+</Layout>
+
+<style is:global>
+  .prose {
+    color: var(--text-primary);
+    line-height: 1.7;
+    font-size: 18px;
+  }
+  .prose h2 {
+    font-size: 28px;
+    margin-top: 48px;
+    margin-bottom: 24px;
+  }
+  .prose h3 {
+    font-size: 22px;
+    margin-top: 32px;
+    margin-bottom: 16px;
+  }
+  .prose p {
+    margin-bottom: 24px;
+  }
+  .prose a {
+    color: var(--accent-color);
+  }
+</style>
