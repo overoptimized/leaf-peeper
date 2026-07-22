@@ -14,7 +14,14 @@ const { entry } = Astro.props;
 const { Content } = await entry.render();
 ---
 
-<Layout>
+<Layout
+  title={entry.data.title}
+  description={entry.data.description}
+  type="article"
+  pageType="BlogPosting"
+  datePublished={entry.data.date}
+  fullScreen={false}
+>
   <div style={{ maxWidth: '800px', margin: '0 auto', padding: '48px 24px' }}>
     <div style={{ color: '#fbbf24', fontWeight: 600, marginBottom: '8px' }}>
       PREDICTION / FORECAST {entry.data.targetYear && `FOR ${entry.data.targetYear}`}

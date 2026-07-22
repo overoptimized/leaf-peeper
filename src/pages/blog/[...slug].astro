@@ -14,7 +14,14 @@ const { entry } = Astro.props;
 const { Content } = await entry.render();
 ---
 
-<Layout>
+<Layout
+  title={entry.data.title}
+  description={entry.data.description}
+  type="article"
+  pageType="BlogPosting"
+  datePublished={entry.data.date}
+  fullScreen={false}
+>
   <div style={{ maxWidth: '800px', margin: '0 auto', padding: '48px 24px' }}>
     <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>{entry.data.title}</h1>
     {entry.data.date && <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>{entry.data.date}</p>}

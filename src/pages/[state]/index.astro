@@ -7,21 +7,12 @@ import FoliageMap from '../../components/FoliageMap';
 import StateDropdown from '../../components/StateDropdown';
 import geojsonData from '../../../public/us-states.json';
 
-export function getStaticPaths() {
-  return statesData.map(state => ({
-    params: { state: state.stateSlug },
-    props: { 
-      stateName: state.stateName,
-      stateLat: state.lat,
-      stateLng: state.lng,
-      stateZoom: state.zoom,
-      stateLocations: locations.filter(l => l.stateSlug === state.stateSlug)
-    }
-  }));
-}
-
 const { state } = Astro.params;
-const { stateName, stateLat, stateLng, stateZoom, stateLocations } = Astro.props;
+const stateInfo = (statesData as any[]).find((s: any) => s.stateSlug === state);
+if (!stateInfo) return Astro.redirect('/404');
+
+const { stateName, lat: stateLat, lng: stateLng, zoom: stateZoom } = stateInfo;
+const stateLocations = (locations as any[]).filter((l: any) => l.stateSlug === state);
 
 // Group locations by city to display hubs (if any exist for this state)
 const hubsMap = new Map();

@@ -20,9 +20,14 @@ const getSliderValueFromPeak = (peakString) => {
   return 1;
 };
 
-const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSON = null, peakString = null, boundaryGeoJSON = null, markersGeoJSON = null, statesGeoJSON = null }) => {
+const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSON = null, routeGeoJSONUrl = null, peakString = null, boundaryGeoJSON = null, markersGeoJSON = null, statesGeoJSON = null, poiSlug = null }) => {
   const [activeOverlay, setActiveOverlay] = useState('color');
   const [windowSize, setWindowSize] = useState({ width: 1200, height: 800 });
+  const [poiGeoJSON, setPoiGeoJSON] = useState(null);
+  const [usMaskGeoJSON, setUsMaskGeoJSON] = useState(null);
+  const [activePois, setActivePois] = useState({
+    gas: false, food: false, lodging: false, trailhead: true, viewpoint: true, bathroom: false, picnic: false
+  });
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -32,6 +37,38 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
       return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
+
+  useEffect(() => {
+    fetch('/data/us_mask.json')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setUsMaskGeoJSON(data);
+      })
+      .catch(err => console.error('Failed to load US mask', err));
+  }, []);
+
+  // Fetch POIs if poiSlug is provided
+  useEffect(() => {
+    if (poiSlug) {
+      fetch(`/data/poi/${poiSlug}.json`)
+        .then(res => {
+          if (res.ok) return res.json();
+          throw new Error('No POI data');
+        })
+        .then(data => setPoiGeoJSON(data))
+        .catch(err => setPoiGeoJSON(null));
+    } else {
+      setPoiGeoJSON(null);
+    }
+  }, [poiSlug]);
+
+  const filteredPoiGeoJSON = useMemo(() => {
+    if (!poiGeoJSON) return null;
+    return {
+      ...poiGeoJSON,
+      features: poiGeoJSON.features.filter(f => activePois[f.properties.type])
+    };
+  }, [poiGeoJSON, activePois]);
 
   // Calculate dynamic fitBounds padding to avoid the sidebar
   const fitPadding = windowSize.width <= 768 
@@ -152,15 +189,29 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
           url={imageUrl} 
           coordinates={imageCoordinates}
         >
-          <Layer 
-            id="foliage-layer" 
-            type="raster" 
+          <Layer
+            id="foliage-layer"
+            type="raster"
             paint={{
-              'raster-opacity': 0.7, // Lower opacity to let terrain shine through
-              'raster-fade-duration': 0
-            }} 
+              'raster-opacity': activeOverlay !== 'none' ? 0.75 : 0,
+              'raster-fade-duration': 300
+            }}
           />
         </Source>
+
+        {/* Global Mask Layer to highlight US */}
+        {usMaskGeoJSON && (
+          <Source id="us-mask-source" type="geojson" data={usMaskGeoJSON}>
+            <Layer
+              id="us-mask-layer"
+              type="fill"
+              paint={{
+                'fill-color': '#000000',
+                'fill-opacity': 0.65
+              }}
+            />
+          </Source>
+        )}
 
         {/* Reference layer for Highways/Roads */}
         <Source id="esri-transportation" type="raster" tiles={['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}']} tileSize={256}>
@@ -178,9 +229,9 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
           <Layer id="esri-reference-layer" type="raster" paint={{ 'raster-opacity': 1.0 }} />
         </Source>
 
-        {/* Route GeoJSON Highlight */}
-        {routeGeoJSON && (
-          <Source id="route-source" type="geojson" data={routeGeoJSON}>
+        {/* Route GeoJSON Highlight — accepts inline object or URL (fetched by MapLibre) */}
+        {(routeGeoJSON || routeGeoJSONUrl) && (
+          <Source id="route-source" type="geojson" data={routeGeoJSON || routeGeoJSONUrl}>
             <Layer
               id="route-layer"
               type="line"
@@ -271,8 +322,82 @@ const FoliageMap = ({ center = [39.8283, -98.5795], initialZoom = 4, routeGeoJSO
           </Source>
         )}
 
+        {/* POI GeoJSON */}
+        {filteredPoiGeoJSON && (
+          <Source id="poi-source" type="geojson" data={filteredPoiGeoJSON}>
+            <Layer
+              id="poi-layer-circle"
+              type="circle"
+              paint={{
+                'circle-radius': [
+                  'match', ['get', 'type'],
+                  'trailhead', 6,
+                  'viewpoint', 6,
+                  'gas', 5,
+                  'food', 5,
+                  'lodging', 5,
+                  'bathroom', 4,
+                  4
+                ],
+                'circle-color': [
+                  'match', ['get', 'type'],
+                  'trailhead', '#22c55e', // green
+                  'viewpoint', '#3b82f6', // blue
+                  'gas', '#ef4444', // red
+                  'food', '#f59e0b', // orange
+                  'lodging', '#8b5cf6', // purple
+                  'bathroom', '#64748b', // slate
+                  '#ffffff'
+                ],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff'
+              }}
+            />
+            <Layer
+              id="poi-layer-label"
+              type="symbol"
+              layout={{
+                'text-field': ['get', 'name'],
+                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                'text-size': 11,
+                'text-offset': [0, 1.2],
+                'text-anchor': 'top',
+                'text-optional': true // Hide if overlapping
+              }}
+              paint={{
+                'text-color': '#ffffff',
+                'text-halo-color': 'rgba(0,0,0,0.8)',
+                'text-halo-width': 2
+              }}
+            />
+          </Source>
+        )}
+
         <NavigationControl position="bottom-right" />
       </Map>
+
+      {/* POI Toggles Panel */}
+      {poiGeoJSON && (
+        <div style={{
+          position: 'absolute', bottom: '100px', right: '24px', zIndex: 1000,
+          background: 'rgba(25, 30, 40, 0.75)', backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px'
+        }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Points of Interest</div>
+          {Object.keys(activePois).map(type => (
+            <label key={type} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.8)', fontSize: '13px', cursor: 'pointer', textTransform: 'capitalize' }}>
+              <input 
+                type="checkbox" 
+                checked={activePois[type]} 
+                onChange={() => setActivePois(prev => ({ ...prev, [type]: !prev[type] }))} 
+                style={{ accentColor: '#F97316' }}
+              />
+              {type}
+            </label>
+          ))}
+        </div>
+      )}
 
       {/* Overlay Toggles */}
       <div style={{ 

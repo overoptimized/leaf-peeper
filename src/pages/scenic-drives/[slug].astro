@@ -6,14 +6,9 @@ import drives from '../../data/drives.json';
 import locations from '../../data/locations.json';
 import statesData from '../../data/states.json';
 
-export function getStaticPaths() {
-  return drives.map(drive => ({
-    params: { slug: drive.slug },
-    props: { drive },
-  }));
-}
-
-const { drive } = Astro.props;
+const { slug } = Astro.params;
+const drive = (drives as any[]).find((d: any) => d.slug === slug);
+if (!drive) return Astro.redirect('/404');
 
 // Find locations related to this drive
 const driveLocations = locations.filter(loc => drive.locations.includes(loc.slug));
@@ -94,7 +89,7 @@ const mapZoom = drive.center ? 9 : fallbackZoom;
         client:only="react" 
         center={mapCenter} 
         initialZoom={mapZoom} 
-        routeGeoJSON={drive.routeGeoJSON} 
+        routeGeoJSONUrl={`/routes/drive-${drive.slug}.geojson`}
         peakString={driveLocations.length > 0 ? driveLocations[0].historicalPeak : null}
       />
     </div>

@@ -5,26 +5,14 @@ import drives from '../../../data/drives.json';
 import FoliageMap from '../../../components/FoliageMap';
 import StateDropdown from '../../../components/StateDropdown';
 
-export function getStaticPaths() {
-  const pages = [];
-  drives.forEach(drive => {
-    drive.states.forEach(stateSlug => {
-      pages.push({
-        params: { state: stateSlug, drive: drive.slug },
-        props: { drive }
-      });
-    });
-  });
-  return pages;
-}
-
 const { state, drive } = Astro.params;
-const { drive: driveData } = Astro.props;
+const driveData = (drives as any[]).find((d: any) => d.slug === drive);
+if (!driveData) return Astro.redirect('/404');
 
 const title = `${driveData.name} Fall Foliage Scenic Drive`;
 const description = driveData.description;
 
-const routeGeoJSON = driveData.routeGeoJSON;
+const routeGeoJSONUrl = `/routes/drive-${driveData.slug}.geojson`;
 const center = driveData.center || [39.8283, -98.5795];
 ---
 
@@ -38,7 +26,7 @@ const center = driveData.center || [39.8283, -98.5795];
       client:only="react" 
       center={[center[0], center[1]]} 
       initialZoom={9} 
-      routeGeoJSON={routeGeoJSON}
+      routeGeoJSONUrl={routeGeoJSONUrl}
     />
   </section>
 

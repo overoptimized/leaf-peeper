@@ -1,22 +1,29 @@
 ---
 import '../styles/global.css';
 import TopNav from '../components/TopNav';
+import SchemaInjector from 'seo-starter-pack/components/SchemaInjector.astro';
 
 interface Props {
   title?: string;
   description?: string;
   image?: string;
   type?: string;
+  pageType?: string;
+  datePublished?: string;
   fullScreen?: boolean;
 }
 
-const { 
+const {
   title = "Leaf Peeper | Fall Foliage Tracker",
   description = "Get real-time fall foliage updates and find the best fall color with our interactive map. Plan your fall trip today!",
   image = "/images/og-image.jpg",
   type = "website",
+  pageType,
+  datePublished,
   fullScreen = true
 } = Astro.props;
+
+const canonicalURL = Astro.url.href;
 ---
 
 <!doctype html>
@@ -30,18 +37,33 @@ const {
     <!-- SEO Meta Tags -->
     <title>{title}</title>
     <meta name="description" content={description} />
-    
-    <!-- Open Graph / Facebook -->
+    <link rel="canonical" href={canonicalURL} />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- Open Graph -->
     <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
 
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:title" content={title} />
-    <meta property="twitter:description" content={description} />
-    <meta property="twitter:image" content={image} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@leafpeeper" />
+    <meta name="twitter:creator" content="@leedriggers" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+
+    <SchemaInjector
+      title={title}
+      description={description}
+      canonicalURL={canonicalURL}
+      image={image}
+      siteName="Leaf Peeper"
+      pageType={pageType}
+      datePublished={datePublished}
+    />
     
     <slot name="head" />
 	</head>

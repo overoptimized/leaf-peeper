@@ -4,17 +4,15 @@ import FoliageMap from '../../components/FoliageMap';
 import LocationDetails from '../../components/LocationDetails';
 import locations from '../../data/locations.json';
 
-export function getStaticPaths() {
-  return locations.map((location) => ({
-    params: { slug: location.slug },
-    props: { location },
-  }));
-}
-
-const { location } = Astro.props;
+const { slug } = Astro.params;
+const location = (locations as any[]).find((l: any) => l.slug === slug);
+if (!location) return Astro.redirect('/404');
 ---
 
-<Layout>
+<Layout
+  title={`${location.name} Fall Foliage | Leaf Peeper`}
+  description={location.description || `Track fall foliage conditions at ${location.name}. Get peak timing predictions, color reports, and trip planning tips.`}
+>
 	<main style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
 		<FoliageMap client:only="react" center={[location.coordinates.lat, location.coordinates.lng]} initialZoom={10} />
 		<LocationDetails client:load location={location} />
